@@ -1,0 +1,48 @@
+[package]
+name = "adaptive-slm"
+version = "0.1.0"
+edition = "2021"
+authors = ["AdaptiveSLM Team"]
+description = "Rust wrapper for AdaptiveSLM - Research-Grade On-Device Language Model"
+license = "MIT"
+
+[lib]
+name = "adaptive_slm"
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+# Async runtime
+tokio = { version = "1.35", features = ["full"] }
+
+# HTTP client for Tavily
+reqwest = { version = "0.11", features = ["json", "rustls-tls"], default-features = false }
+
+# Serialization
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+
+# SQLite with vector extension
+rusqlite = { version = "0.30", features = ["bundled"] }
+
+# Logging
+tracing = "0.1"
+tracing-subscriber = "0.3"
+
+# Error handling
+thiserror = "1.0"
+anyhow = "1.0"
+
+# FFI utilities
+libc = "0.2"
+
+# Time utilities
+chrono = { version = "0.4", features = ["serde"] }
+
+[build-dependencies]
+cc = "1.0"
+
+[profile.release]
+lto = true
+codegen-units = 1
+panic = "abort"
+strip = true

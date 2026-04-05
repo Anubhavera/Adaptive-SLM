@@ -1,0 +1,3 @@
+# This directory stores GGUF model files
+# Download Qwen2.5-0.5B-Instruct-Q4_K_M.gguf from HuggingFace:
+# https://huggingface.co/Qwen/Qwen2.5-0.5B-Instruct-GGUF

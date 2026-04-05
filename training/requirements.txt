@@ -1,0 +1,28 @@
+# AdaptiveSLM Training Dependencies
+
+# Core
+torch>=2.1.0
+transformers>=4.36.0
+datasets>=2.16.0
+accelerate>=0.25.0
+
+# Memory Optimization
+bitsandbytes>=0.41.0         # 4-bit quantization for teacher
+flash-attn>=2.4.0            # Flash attention (optional, needs CUDA)
+
+# Data Processing
+tokenizers>=0.15.0
+sentencepiece>=0.1.99
+
+# Monitoring
+wandb>=0.16.0                # Experiment tracking
+tensorboard>=2.15.0
+
+# Evaluation
+lm-eval>=0.4.0               # For MMLU evaluation
+rouge-score>=0.1.2
+
+# Utilities
+tqdm>=4.66.0
+pyyaml>=6.0.0
+psutil>=5.9.0                # Memory monitoring
