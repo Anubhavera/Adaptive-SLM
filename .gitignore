@@ -1,0 +1,48 @@
+# OS and editor files
+.DS_Store
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# IDE/editor settings
+.vscode/
+.idea/
+*.swp
+*~
+
+# Build artifacts
+/build/
+/build_*/
+/build-*/
+core/build/
+core/build_*/
+build_new/
+CMakeFiles/
+CMakeCache.txt
+cmake_install.cmake
+Makefile
+*.o
+*.obj
+*.a
+*.lib
+*.dll
+*.so
+*.dylib
+*.exe
+*.pdb
+
+# Rust
+**/target/
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.egg-info/
+.venv/
+venv/
+.env
+
+# Logs
+*.log
