@@ -56,15 +56,37 @@ def run_adaptive_slm_bench(model_path: str) -> BenchmarkResult:
     print(result.stdout)
     if result.stderr:
         print(result.stderr)
-    
-    # Parse output (simplified)
-    tokens_per_sec = 50.0  # Placeholder - would parse from actual output
-    
+
+    # Parse benchmark output for real metrics
+    tokens_per_sec = 0.0
+    ram_usage_mb = 0.0
+    output = result.stdout
+
+    for line in output.splitlines():
+        if "tokens per second:" in line.lower() or "tok/s)" in line:
+            import re
+            match = re.search(r'([\d.]+)\s*tok/s', line)
+            if match:
+                tokens_per_sec = max(tokens_per_sec, float(match.group(1)))
+        if "Model + state size:" in line or "Current state size:" in line:
+            match = re.search(r'([\d.]+)\s*MB', line)
+            if match:
+                ram_usage_mb = max(ram_usage_mb, float(match.group(1)))
+
+    if tokens_per_sec == 0.0:
+        print("[WARN] Could not parse tok/s from benchmark output")
+    if ram_usage_mb == 0.0:
+        ram_usage_mb = peak_mem - start_mem
+
+    # Detect fake output
+    if "Demo response" in output:
+        print("[FAIL] Benchmark produced FAKE output — inference is not real!")
+        tokens_per_sec = 0.0
+
     return BenchmarkResult(
         model_name="AdaptiveSLM",
-        ram_usage_mb=peak_mem - start_mem + 300,  # Approximate
+        ram_usage_mb=ram_usage_mb,
         tokens_per_sec=tokens_per_sec,
-        cache_hit_rate=0.75  # Target
     )
 
 def compare_results(results: list[BenchmarkResult]) -> None:

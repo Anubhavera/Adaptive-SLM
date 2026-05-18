@@ -9,6 +9,13 @@
 #include <fstream>
 #include <sstream>
 
+#ifdef _WIN32
+    #define WIN32_LEAN_AND_MEAN
+    #include <windows.h>
+    #include <powerbase.h>
+    #pragma comment(lib, "PowrProf.lib")
+#endif
+
 namespace aslm {
 
 ContextAdapter::ContextAdapter(const ACCConfig& config)
@@ -105,41 +112,80 @@ void ContextAdapter::reset() {
 }
 
 // ============================================================================
-// System resource monitoring (Linux implementation)
+// System resource monitoring — cross-platform
 // ============================================================================
 
+#ifdef _WIN32
+
 aslm_device_state getCurrentDeviceState() {
-    aslm_device_state state = {
-        .available_ram_bytes = 0,
-        .total_ram_bytes = 0,
-        .cpu_usage = 0.0f,
-        .battery_level = -1.0f,
-        .is_charging = false
-    };
-    
-    // Read /proc/meminfo for RAM
+    aslm_device_state state = {0, 0, 0.0f, -1.0f, false};
+
+    // RAM via GlobalMemoryStatusEx
+    MEMORYSTATUSEX mem_info;
+    mem_info.dwLength = sizeof(mem_info);
+    if (GlobalMemoryStatusEx(&mem_info)) {
+        state.total_ram_bytes = mem_info.ullTotalPhys;
+        state.available_ram_bytes = mem_info.ullAvailPhys;
+    }
+
+    // CPU via GetSystemTimes delta
+    static ULARGE_INTEGER prev_idle_time = {0}, prev_kernel_time = {0}, prev_user_time = {0};
+    FILETIME idle_ft, kernel_ft, user_ft;
+    if (GetSystemTimes(&idle_ft, &kernel_ft, &user_ft)) {
+        ULARGE_INTEGER idle, kernel, user;
+        idle.LowPart = idle_ft.dwLowDateTime;   idle.HighPart = idle_ft.dwHighDateTime;
+        kernel.LowPart = kernel_ft.dwLowDateTime; kernel.HighPart = kernel_ft.dwHighDateTime;
+        user.LowPart = user_ft.dwLowDateTime;   user.HighPart = user_ft.dwHighDateTime;
+
+        uint64_t idle_diff = idle.QuadPart - prev_idle_time.QuadPart;
+        uint64_t total_diff = (kernel.QuadPart + user.QuadPart)
+                            - (prev_kernel_time.QuadPart + prev_user_time.QuadPart);
+
+        if (total_diff > 0) {
+            state.cpu_usage = 1.0f - static_cast<float>(idle_diff) / static_cast<float>(total_diff);
+            state.cpu_usage = std::clamp(state.cpu_usage, 0.0f, 1.0f);
+        }
+
+        prev_idle_time = idle;
+        prev_kernel_time = kernel;
+        prev_user_time = user;
+    }
+
+    // Battery via GetSystemPowerStatus
+    SYSTEM_POWER_STATUS power;
+    if (GetSystemPowerStatus(&power)) {
+        if (power.BatteryLifePercent != 255) {
+            state.battery_level = static_cast<float>(power.BatteryLifePercent) / 100.0f;
+        }
+        state.is_charging = (power.ACLineStatus == 1);
+    }
+
+    return state;
+}
+
+#else // Linux / POSIX
+
+aslm_device_state getCurrentDeviceState() {
+    aslm_device_state state = {0, 0, 0.0f, -1.0f, false};
+
+    // RAM via /proc/meminfo
     std::ifstream meminfo("/proc/meminfo");
     if (meminfo.is_open()) {
         std::string line;
-        uint64_t mem_total = 0, mem_available = 0;
-        
         while (std::getline(meminfo, line)) {
             if (line.find("MemTotal:") == 0) {
                 std::istringstream iss(line.substr(9));
-                iss >> mem_total;
-                mem_total *= 1024;  // Convert from KB to bytes
+                uint64_t kb; iss >> kb;
+                state.total_ram_bytes = kb * 1024;
             } else if (line.find("MemAvailable:") == 0) {
                 std::istringstream iss(line.substr(13));
-                iss >> mem_available;
-                mem_available *= 1024;
+                uint64_t kb; iss >> kb;
+                state.available_ram_bytes = kb * 1024;
             }
         }
-        
-        state.total_ram_bytes = mem_total;
-        state.available_ram_bytes = mem_available;
     }
-    
-    // Read /proc/stat for CPU usage
+
+    // CPU via /proc/stat delta
     static uint64_t prev_idle = 0, prev_total = 0;
     std::ifstream stat("/proc/stat");
     if (stat.is_open()) {
@@ -149,37 +195,39 @@ aslm_device_state getCurrentDeviceState() {
             std::istringstream iss(line.substr(4));
             uint64_t user, nice, system, idle, iowait, irq, softirq;
             iss >> user >> nice >> system >> idle >> iowait >> irq >> softirq;
-            
+
             uint64_t total = user + nice + system + idle + iowait + irq + softirq;
             uint64_t total_diff = total - prev_total;
             uint64_t idle_diff = idle - prev_idle;
-            
+
             if (total_diff > 0) {
-                state.cpu_usage = 1.0f - static_cast<float>(idle_diff) / 
+                state.cpu_usage = 1.0f - static_cast<float>(idle_diff) /
                                          static_cast<float>(total_diff);
             }
-            
+
             prev_idle = idle;
             prev_total = total;
         }
     }
-    
-    // Try to read battery info (if available)
+
+    // Battery (Linux sysfs)
     std::ifstream battery("/sys/class/power_supply/BAT0/capacity");
     if (battery.is_open()) {
         int capacity;
         battery >> capacity;
         state.battery_level = static_cast<float>(capacity) / 100.0f;
     }
-    
+
     std::ifstream charging("/sys/class/power_supply/BAT0/status");
     if (charging.is_open()) {
         std::string status;
         charging >> status;
         state.is_charging = (status == "Charging" || status == "Full");
     }
-    
+
     return state;
 }
+
+#endif
 
 } // namespace aslm

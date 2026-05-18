@@ -303,15 +303,55 @@ impl KnowledgeCache {
         })
     }
     
-    // Simplified embedding computation (for demo)
+    /// Compute text embedding using word + character n-gram feature hashing.
+    /// Produces a 384-dim vector where semantically similar texts cluster together.
+    /// This is a lightweight alternative to neural embeddings, suitable for on-device
+    /// cache similarity matching without requiring an external embedding model.
     fn compute_embedding(&self, text: &str) -> Vec<f32> {
-        let mut embedding = vec![0.0f32; 384];
-        for (i, c) in text.chars().enumerate() {
-            let idx = (c as usize * 7 + i * 13) % 384;
-            embedding[idx] += (c as u32 as f32).sin() * 0.1;
+        let dim = 384usize;
+        let mut embedding = vec![0.0f32; dim];
+        let lower = text.to_lowercase();
+        let words: Vec<&str> = lower.split_whitespace().collect();
+
+        // Word unigram features (captures topic keywords)
+        for word in &words {
+            let h = Self::fnv1a_hash(word.as_bytes());
+            let idx = (h as usize) % dim;
+            let sign = if (h >> 17) & 1 == 0 { 1.0 } else { -1.0 };
+            embedding[idx] += sign;
         }
+
+        // Word bigram features (captures phrasing/context)
+        for pair in words.windows(2) {
+            let combined = format!("{} {}", pair[0], pair[1]);
+            let h = Self::fnv1a_hash(combined.as_bytes());
+            let idx = (h as usize) % dim;
+            let sign = if (h >> 17) & 1 == 0 { 1.0 } else { -1.0 };
+            embedding[idx] += sign * 0.7;
+        }
+
+        // Character trigram features (captures morphology, handles typos)
+        let chars: Vec<char> = lower.chars().collect();
+        for window in chars.windows(3) {
+            let trigram: String = window.iter().collect();
+            let h = Self::fnv1a_hash(trigram.as_bytes());
+            let idx = (h as usize) % dim;
+            let sign = if (h >> 17) & 1 == 0 { 1.0 } else { -1.0 };
+            embedding[idx] += sign * 0.3;
+        }
+
         normalize(&mut embedding);
         embedding
+    }
+
+    /// FNV-1a hash for feature hashing — fast, good distribution
+    fn fnv1a_hash(bytes: &[u8]) -> u64 {
+        let mut hash: u64 = 0xcbf29ce484222325;
+        for &b in bytes {
+            hash ^= b as u64;
+            hash = hash.wrapping_mul(0x100000001b3);
+        }
+        hash
     }
 }
 

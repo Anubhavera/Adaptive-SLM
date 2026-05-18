@@ -1,0 +1,18 @@
+{
+  "permissions": {
+    "allow": [
+      "Read(**)",
+      "Glob(**)",
+      "Grep(**)",
+      "Bash(cmake *)",
+      "Bash(cargo *)",
+      "Bash(python *)",
+      "Bash(git status*)",
+      "Bash(git diff*)",
+      "Bash(git log*)",
+      "Bash(ls *)",
+      "Bash(head *)",
+      "Bash(wc *)"
+    ]
+  }
+}

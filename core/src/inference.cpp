@@ -1,51 +1,54 @@
 /**
- * Main Inference Engine Implementation
- * Integrates GGML for Q4 quantized inference
+ * AdaptiveSLM Inference Engine
+ * Real model inference via llama.cpp with ACC integration
  */
 
 #include "adaptive_slm.h"
 #include "context_adapt.h"
-#include "embeddings.h"
 #include "user_profile.h"
 
+#include <llama.h>
 #include <ggml.h>
 
 #include <cstring>
 #include <string>
+#include <vector>
 #include <memory>
-#include <fstream>
 #include <iostream>
+#include <algorithm>
+#include <thread>
 
 namespace aslm {
 
-/**
- * Internal context structure
- */
 struct Context {
-    // GGML context
-    struct ggml_context* ggml_ctx = nullptr;
-    
-    // Model weights (memory-mapped)
-    void* model_mmap = nullptr;
-    size_t model_size = 0;
-    
-    // Configuration
+    llama_model* model = nullptr;
+    llama_context* llama_ctx = nullptr;
+    llama_sampler* sampler = nullptr;
+
     aslm_init_params init_params;
-    
-    // ACC module
+
     std::unique_ptr<ContextAdapter> acc;
     int32_t current_context_size = 512;
-    
-    // User profile (optional)
+
     const UserProfile* user_profile = nullptr;
-    
-    // Memory tracking
-    uint64_t memory_usage = 0;
+
     uint64_t peak_memory = 0;
-    
-    // State
     bool is_initialized = false;
 };
+
+static llama_sampler* create_sampler(const aslm_gen_params* params) {
+    auto* smpl = llama_sampler_chain_init(llama_sampler_chain_default_params());
+    llama_sampler_chain_add(smpl, llama_sampler_init_penalties(
+        params->repeat_penalty,   // penalty_repeat
+        0.0f,                     // penalty_freq
+        0.0f                      // penalty_present
+    ));
+    llama_sampler_chain_add(smpl, llama_sampler_init_top_k(params->top_k));
+    llama_sampler_chain_add(smpl, llama_sampler_init_top_p(params->top_p, 1));
+    llama_sampler_chain_add(smpl, llama_sampler_init_temp(params->temperature));
+    llama_sampler_chain_add(smpl, llama_sampler_init_dist(LLAMA_DEFAULT_SEED));
+    return smpl;
+}
 
 } // namespace aslm
 
@@ -58,7 +61,7 @@ extern "C" {
 aslm_init_params aslm_default_init_params(void) {
     return aslm_init_params{
         .model_path = nullptr,
-        .n_threads = 0,      // Auto-detect
+        .n_threads = 0,
         .max_context = 2048,
         .use_mmap = true,
         .verbose = false
@@ -70,82 +73,74 @@ aslm_context* aslm_init(const aslm_init_params* params) {
         std::cerr << "[ASLM] Error: model_path is required\n";
         return nullptr;
     }
-    
+
     auto* ctx = new aslm::Context();
     ctx->init_params = *params;
-    
+
     // Initialize ACC
     aslm::ACCConfig acc_config;
     acc_config.max_context = params->max_context;
     ctx->acc = std::make_unique<aslm::ContextAdapter>(acc_config);
     ctx->current_context_size = acc_config.base_context;
-    
-    // Calculate GGML memory requirements
-    // For a 500M parameter model with Q4 quantization:
-    // ~250MB for weights + ~50MB for compute buffer
-    size_t mem_size = 300 * 1024 * 1024;  // 300 MB
-    
-    struct ggml_init_params ggml_params = {
-        .mem_size = mem_size,
-        .mem_buffer = nullptr,
-        .no_alloc = false
-    };
-    
-    ctx->ggml_ctx = ggml_init(ggml_params);
-    if (!ctx->ggml_ctx) {
-        std::cerr << "[ASLM] Error: failed to initialize GGML\n";
+
+    // Load model via llama.cpp
+    llama_model_params mparams = llama_model_default_params();
+    mparams.use_mmap = params->use_mmap;
+
+    if (params->verbose) {
+        std::cout << "[ASLM] Loading model: " << params->model_path << "\n";
+    }
+
+    ctx->model = llama_model_load_from_file(params->model_path, mparams);
+    if (!ctx->model) {
+        std::cerr << "[ASLM] Error: failed to load model from " << params->model_path << "\n";
         delete ctx;
         return nullptr;
     }
-    
-    ctx->memory_usage = mem_size;
-    ctx->peak_memory = mem_size;
-    
-    // Check if model file exists
-    std::ifstream model_file(params->model_path, std::ios::binary);
-    if (!model_file.is_open()) {
-        std::cerr << "[ASLM] Warning: model file not found: " << params->model_path << "\n";
-        std::cerr << "[ASLM] Running in demo mode without model weights\n";
-    } else {
-        // Get model file size
-        model_file.seekg(0, std::ios::end);
-        ctx->model_size = model_file.tellg();
-        model_file.close();
-        
-        if (params->verbose) {
-            std::cout << "[ASLM] Model size: " << (ctx->model_size / 1024 / 1024) << " MB\n";
-        }
-        
-        // In a full implementation, we would memory-map and load the model here
-        // For now, we just track the size
-        ctx->memory_usage += ctx->model_size;
-        ctx->peak_memory = std::max(ctx->peak_memory, ctx->memory_usage);
+
+    // Create inference context
+    llama_context_params cparams = llama_context_default_params();
+    cparams.n_ctx = params->max_context;
+    cparams.n_threads = params->n_threads > 0
+        ? params->n_threads
+        : static_cast<int32_t>(std::thread::hardware_concurrency());
+    cparams.n_threads_batch = cparams.n_threads;
+
+    ctx->llama_ctx = llama_init_from_model(ctx->model, cparams);
+    if (!ctx->llama_ctx) {
+        std::cerr << "[ASLM] Error: failed to create llama context\n";
+        llama_model_free(ctx->model);
+        delete ctx;
+        return nullptr;
     }
-    
+
     ctx->is_initialized = true;
-    
+
     if (params->verbose) {
-        std::cout << "[ASLM] Initialized with context size: " << ctx->current_context_size << "\n";
-        std::cout << "[ASLM] Memory usage: " << (ctx->memory_usage / 1024 / 1024) << " MB\n";
+        std::cout << "[ASLM] Model loaded successfully\n";
+        std::cout << "[ASLM] Context size: " << params->max_context << " tokens\n";
+        std::cout << "[ASLM] Threads: " << cparams.n_threads << "\n";
+        std::cout << "[ASLM] Vocab size: " << llama_model_n_vocab(ctx->model) << "\n";
     }
-    
+
     return reinterpret_cast<aslm_context*>(ctx);
 }
 
 void aslm_free(aslm_context* handle) {
     if (!handle) return;
-    
+
     auto* ctx = reinterpret_cast<aslm::Context*>(handle);
-    
-    if (ctx->ggml_ctx) {
-        ggml_free(ctx->ggml_ctx);
+
+    if (ctx->sampler) {
+        llama_sampler_free(ctx->sampler);
     }
-    
-    // Unmap model if memory-mapped
-    if (ctx->model_mmap) {
-        // munmap would go here
+    if (ctx->llama_ctx) {
+        llama_free(ctx->llama_ctx);
     }
-    
+    if (ctx->model) {
+        llama_model_free(ctx->model);
+    }
+
     delete ctx;
 }
 
@@ -156,54 +151,111 @@ int32_t aslm_generate(
     char* output,
     size_t output_size
 ) {
-    if (!handle || !prompt || !output || output_size == 0) {
+    if (!handle || !prompt || !output || output_size == 0 || !params) {
         return -1;
     }
-    
+
     auto* ctx = reinterpret_cast<aslm::Context*>(handle);
-    
-    if (!ctx->is_initialized) {
+    if (!ctx->is_initialized || !ctx->model || !ctx->llama_ctx) {
         return -1;
     }
-    
-    // Build full prompt with user profile modifier
+
+    // Build full prompt with profile modifier
     std::string full_prompt;
     if (ctx->user_profile) {
         full_prompt = ctx->user_profile->getPromptModifier();
     }
     full_prompt += prompt;
-    
-    // In a full implementation, this would:
-    // 1. Tokenize the prompt
-    // 2. Run forward pass through the model
-    // 3. Sample tokens autoregressively
-    // 4. Detokenize and return
-    
-    // For demo, we generate a placeholder response
-    std::string response = "[AdaptiveSLM] Demo response for: ";
-    response += prompt;
-    response += "\n\n";
-    response += "Context size: " + std::to_string(ctx->current_context_size) + " tokens\n";
-    response += "Memory usage: " + std::to_string(ctx->memory_usage / 1024 / 1024) + " MB\n";
-    
-    if (ctx->user_profile) {
-        response += "Profile-aware response enabled.\n";
+
+    const llama_vocab* vocab = llama_model_get_vocab(ctx->model);
+
+    // Tokenize the prompt
+    int n_prompt_max = full_prompt.size() + 128;
+    std::vector<llama_token> prompt_tokens(n_prompt_max);
+    int n_prompt_tokens = llama_tokenize(
+        vocab,
+        full_prompt.c_str(),
+        full_prompt.size(),
+        prompt_tokens.data(),
+        n_prompt_max,
+        true,   // add_special (BOS)
+        true    // parse_special
+    );
+
+    if (n_prompt_tokens < 0) {
+        std::cerr << "[ASLM] Error: tokenization failed\n";
+        return -1;
     }
-    
-    // Copy to output buffer
-    size_t copy_len = std::min(response.size(), output_size - 1);
-    std::memcpy(output, response.c_str(), copy_len);
+    prompt_tokens.resize(n_prompt_tokens);
+
+    // Check prompt fits in context
+    int n_ctx = llama_n_ctx(ctx->llama_ctx);
+    int effective_ctx = std::min(n_ctx, ctx->current_context_size);
+    if (n_prompt_tokens >= effective_ctx) {
+        std::cerr << "[ASLM] Error: prompt too long (" << n_prompt_tokens
+                  << " tokens) for context (" << effective_ctx << ")\n";
+        return -1;
+    }
+
+    // Clear KV cache for fresh generation
+    llama_kv_cache_clear(ctx->llama_ctx);
+
+    // Free previous sampler if any, create new one with current params
+    if (ctx->sampler) {
+        llama_sampler_free(ctx->sampler);
+    }
+    ctx->sampler = aslm::create_sampler(params);
+
+    // Process prompt tokens in a single batch
+    llama_batch batch = llama_batch_get_one(prompt_tokens.data(), n_prompt_tokens);
+    if (llama_decode(ctx->llama_ctx, batch) != 0) {
+        std::cerr << "[ASLM] Error: prompt decode failed\n";
+        return -1;
+    }
+
+    // Autoregressive generation
+    std::string result;
+    int32_t n_generated = 0;
+    int32_t max_tokens = std::min(params->max_tokens, effective_ctx - n_prompt_tokens);
+
+    for (int32_t i = 0; i < max_tokens; ++i) {
+        llama_token new_token = llama_sampler_sample(ctx->sampler, ctx->llama_ctx, -1);
+
+        // Check for end of generation
+        if (llama_vocab_is_eog(vocab, new_token)) {
+            break;
+        }
+
+        // Detokenize the token
+        char piece[128];
+        int n_piece = llama_token_to_piece(vocab, new_token, piece, sizeof(piece), 0, true);
+        if (n_piece > 0) {
+            result.append(piece, n_piece);
+        }
+
+        n_generated++;
+
+        // Decode the new token for next iteration
+        llama_batch next_batch = llama_batch_get_one(&new_token, 1);
+        if (llama_decode(ctx->llama_ctx, next_batch) != 0) {
+            std::cerr << "[ASLM] Error: decode failed at token " << i << "\n";
+            break;
+        }
+    }
+
+    // Copy result to output buffer
+    size_t copy_len = std::min(result.size(), output_size - 1);
+    std::memcpy(output, result.c_str(), copy_len);
     output[copy_len] = '\0';
-    
-    // Return approximate token count
-    return static_cast<int32_t>(copy_len / 4);
+
+    return n_generated;
 }
 
 void aslm_update_device_state(aslm_context* handle, const aslm_device_state* state) {
     if (!handle || !state) return;
-    
+
     auto* ctx = reinterpret_cast<aslm::Context*>(handle);
-    
+
     if (ctx->acc) {
         ctx->current_context_size = ctx->acc->getSmoothedContextSize(*state);
     }
@@ -211,30 +263,109 @@ void aslm_update_device_state(aslm_context* handle, const aslm_device_state* sta
 
 int32_t aslm_get_effective_context_size(const aslm_context* handle) {
     if (!handle) return 512;
-    
+
     const auto* ctx = reinterpret_cast<const aslm::Context*>(handle);
     return ctx->current_context_size;
 }
 
 void aslm_set_user_profile(aslm_context* handle, const aslm_user_profile* profile) {
     if (!handle) return;
-    
+
     auto* ctx = reinterpret_cast<aslm::Context*>(handle);
     ctx->user_profile = reinterpret_cast<const aslm::UserProfile*>(profile);
 }
 
 uint64_t aslm_get_memory_usage(const aslm_context* handle) {
     if (!handle) return 0;
-    
+
     const auto* ctx = reinterpret_cast<const aslm::Context*>(handle);
-    return ctx->memory_usage;
+    if (!ctx->llama_ctx) return 0;
+
+    // Report actual memory used by llama.cpp context
+    return llama_state_get_size(ctx->llama_ctx);
 }
 
 uint64_t aslm_get_peak_memory_usage(const aslm_context* handle) {
     if (!handle) return 0;
-    
+
     const auto* ctx = reinterpret_cast<const aslm::Context*>(handle);
-    return ctx->peak_memory;
+    if (!ctx->llama_ctx) return 0;
+
+    size_t state_size = llama_state_get_size(ctx->llama_ctx);
+    size_t model_size = llama_model_size(ctx->model);
+    return state_size + model_size;
+}
+
+int32_t aslm_generate_stream(
+    aslm_context* handle,
+    const char* prompt,
+    const aslm_gen_params* params,
+    aslm_token_callback callback,
+    void* user_data
+) {
+    if (!handle || !prompt || !params || !callback) {
+        return -1;
+    }
+
+    auto* ctx = reinterpret_cast<aslm::Context*>(handle);
+    if (!ctx->is_initialized || !ctx->model || !ctx->llama_ctx) {
+        return -1;
+    }
+
+    std::string full_prompt;
+    if (ctx->user_profile) {
+        full_prompt = ctx->user_profile->getPromptModifier();
+    }
+    full_prompt += prompt;
+
+    const llama_vocab* vocab = llama_model_get_vocab(ctx->model);
+
+    int n_prompt_max = full_prompt.size() + 128;
+    std::vector<llama_token> prompt_tokens(n_prompt_max);
+    int n_prompt_tokens = llama_tokenize(
+        vocab, full_prompt.c_str(), full_prompt.size(),
+        prompt_tokens.data(), n_prompt_max, true, true
+    );
+
+    if (n_prompt_tokens < 0) return -1;
+    prompt_tokens.resize(n_prompt_tokens);
+
+    int n_ctx = llama_n_ctx(ctx->llama_ctx);
+    int effective_ctx = std::min(n_ctx, ctx->current_context_size);
+    if (n_prompt_tokens >= effective_ctx) return -1;
+
+    llama_kv_cache_clear(ctx->llama_ctx);
+
+    if (ctx->sampler) llama_sampler_free(ctx->sampler);
+    ctx->sampler = aslm::create_sampler(params);
+
+    llama_batch batch = llama_batch_get_one(prompt_tokens.data(), n_prompt_tokens);
+    if (llama_decode(ctx->llama_ctx, batch) != 0) return -1;
+
+    int32_t n_generated = 0;
+    int32_t max_tokens = std::min(params->max_tokens, effective_ctx - n_prompt_tokens);
+
+    for (int32_t i = 0; i < max_tokens; ++i) {
+        llama_token new_token = llama_sampler_sample(ctx->sampler, ctx->llama_ctx, -1);
+
+        if (llama_vocab_is_eog(vocab, new_token)) break;
+
+        char piece[128];
+        int n_piece = llama_token_to_piece(vocab, new_token, piece, sizeof(piece), 0, true);
+        if (n_piece > 0) {
+            piece[n_piece] = '\0';
+            n_generated++;
+
+            if (!callback(piece, n_generated, user_data)) {
+                break;  // User requested early stop
+            }
+        }
+
+        llama_batch next_batch = llama_batch_get_one(&new_token, 1);
+        if (llama_decode(ctx->llama_ctx, next_batch) != 0) break;
+    }
+
+    return n_generated;
 }
 
 }

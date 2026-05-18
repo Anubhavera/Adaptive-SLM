@@ -157,7 +157,26 @@ UserProfile UserProfile::fromJson(const std::string& json) {
             std::stoi(json.substr(exp_pos + 12))
         );
     }
-    
+
+    // Parse interests array: ["item1","item2",...]
+    auto int_pos = json.find("\"interests\":[");
+    if (int_pos != std::string::npos) {
+        auto arr_start = int_pos + 13; // after "interests":[
+        auto arr_end = json.find(']', arr_start);
+        if (arr_end != std::string::npos) {
+            std::string arr = json.substr(arr_start, arr_end - arr_start);
+            size_t pos = 0;
+            while (pos < arr.size()) {
+                auto q1 = arr.find('"', pos);
+                if (q1 == std::string::npos) break;
+                auto q2 = arr.find('"', q1 + 1);
+                if (q2 == std::string::npos) break;
+                interests.push_back(arr.substr(q1 + 1, q2 - q1 - 1));
+                pos = q2 + 1;
+            }
+        }
+    }
+
     return UserProfile(age, background, interests, expertise);
 }
 

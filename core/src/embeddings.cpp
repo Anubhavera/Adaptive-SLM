@@ -63,32 +63,44 @@ std::vector<float> EmbeddingEngine::poolEmbeddings(
     const std::vector<int32_t>& token_ids
 ) const {
     std::vector<float> result(config_.dim, 0.0f);
-    
+
     if (token_ids.empty()) {
         return result;
     }
-    
-    // Simple hash-based pseudo-embedding (for demo)
-    // In production, this would use real vocabulary embeddings
+
+    // Feature hashing with signed projections.
+    // Each token hashes to a dimension and contributes +1 or -1.
+    // This produces a sparse-ish vector where similar word sets cluster.
     for (int32_t token_id : token_ids) {
-        for (int32_t i = 0; i < config_.dim; ++i) {
-            // Deterministic pseudo-random based on token ID and dim
-            float val = std::sin(static_cast<float>(token_id * 1337 + i * 7)) * 0.1f;
-            result[i] += val;
-        }
+        uint64_t h = fnv1a(reinterpret_cast<const uint8_t*>(&token_id), sizeof(token_id));
+        int32_t idx = static_cast<int32_t>(h % config_.dim);
+        float sign = ((h >> 17) & 1) == 0 ? 1.0f : -1.0f;
+        result[idx] += sign;
     }
-    
-    // Average pooling
-    float n = static_cast<float>(token_ids.size());
-    for (float& v : result) {
-        v /= n;
+
+    // Also hash consecutive token pairs (bigram features)
+    for (size_t i = 0; i + 1 < token_ids.size(); ++i) {
+        int32_t pair[2] = {token_ids[i], token_ids[i+1]};
+        uint64_t h = fnv1a(reinterpret_cast<const uint8_t*>(pair), sizeof(pair));
+        int32_t idx = static_cast<int32_t>(h % config_.dim);
+        float sign = ((h >> 17) & 1) == 0 ? 1.0f : -1.0f;
+        result[idx] += sign * 0.7f;
     }
-    
+
     if (config_.normalize) {
         normalize(result.data(), config_.dim);
     }
-    
+
     return result;
+}
+
+uint64_t EmbeddingEngine::fnv1a(const uint8_t* data, size_t len) {
+    uint64_t hash = 0xcbf29ce484222325ULL;
+    for (size_t i = 0; i < len; ++i) {
+        hash ^= data[i];
+        hash *= 0x100000001b3ULL;
+    }
+    return hash;
 }
 
 std::vector<float> EmbeddingEngine::embed(const std::string& text) const {

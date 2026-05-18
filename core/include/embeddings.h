@@ -87,6 +87,11 @@ private:
     std::vector<float> poolEmbeddings(
         const std::vector<int32_t>& token_ids
     ) const;
+
+    /**
+     * FNV-1a hash for feature hashing
+     */
+    static uint64_t fnv1a(const uint8_t* data, size_t len);
 };
 
 } // namespace aslm

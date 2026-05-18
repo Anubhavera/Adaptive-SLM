@@ -1,0 +1,67 @@
+name: Build & Test
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  build-cpp-linux:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: sudo apt-get update && sudo apt-get install -y cmake build-essential
+
+      - name: Configure CMake
+        run: cmake -B core/build -S core -DCMAKE_BUILD_TYPE=Release
+
+      - name: Build
+        run: cmake --build core/build --parallel $(nproc)
+
+      - name: Run benchmarks (no model - ACC & SIMD only)
+        run: ./core/build/adaptive_slm_bench || true
+
+  build-cpp-windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure CMake
+        run: cmake -B core/build -S core -DCMAKE_BUILD_TYPE=Release
+
+      - name: Build
+        run: cmake --build core/build --config Release --parallel
+
+  build-rust:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Build Rust wrapper
+        run: cargo build --release
+        working-directory: rust-wrapper
+
+      - name: Run Rust tests
+        run: cargo test
+        working-directory: rust-wrapper
+
+  lint-python:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install ruff
+
+      - name: Lint training pipeline
+        run: ruff check training/ benchmarks/ --ignore E501

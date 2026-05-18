@@ -40,7 +40,7 @@ class TrainingConfig:
     """Training configuration for AdaptiveSLM"""
     
     # Model Architecture (MobileLLM-style: deep and thin)
-    vocab_size: int = 32000
+    vocab_size: int = 151665  # Qwen2.5 tokenizer vocabulary size
     hidden_size: int = 576          # Thin: smaller hidden dim
     num_layers: int = 30            # Deep: more layers (vs typical 12)
     num_attention_heads: int = 9
@@ -737,14 +737,36 @@ class AdaptiveSLMTrainer:
     def export_gguf(self, output_path: str):
         """Export model to GGUF format for inference"""
         print("\n=== Exporting to GGUF ===")
-        
-        # First save as HuggingFace format
+
+        # Save as HuggingFace format for conversion
         hf_path = os.path.join(self.config.output_dir, "hf_export")
-        # ... conversion logic would go here
-        
-        # Then convert to GGUF using llama.cpp's convert script
-        # This requires llama.cpp to be installed
-        print(f"Run: python llama.cpp/convert-hf-to-gguf.py {hf_path} --outfile {output_path}")
+        os.makedirs(hf_path, exist_ok=True)
+
+        # Save model weights in HF format
+        state_dict = self.model.state_dict()
+        torch.save(state_dict, os.path.join(hf_path, "pytorch_model.bin"))
+
+        # Save config.json for convert script
+        model_config = {
+            "architectures": ["AdaptiveSLMForCausalLM"],
+            "hidden_size": self.config.hidden_size,
+            "intermediate_size": self.config.intermediate_size,
+            "num_attention_heads": self.config.num_attention_heads,
+            "num_key_value_heads": self.config.num_key_value_heads,
+            "num_hidden_layers": self.config.num_layers,
+            "vocab_size": self.config.vocab_size,
+            "max_position_embeddings": self.config.max_position_embeddings,
+            "model_type": "adaptive_slm",
+            "torch_dtype": "float16",
+        }
+        with open(os.path.join(hf_path, "config.json"), "w") as f:
+            json.dump(model_config, f, indent=2)
+
+        print(f"HuggingFace export saved to: {hf_path}")
+        print(f"Convert to GGUF with:")
+        print(f"  python llama.cpp/convert_hf_to_gguf.py {hf_path} --outfile {output_path}")
+        print(f"Quantize with:")
+        print(f"  ./llama.cpp/build/bin/llama-quantize {output_path} {output_path.replace('.gguf', '-q4_k_m.gguf')} Q4_K_M")
 
 # ============================================================================
 # Main Training Script
@@ -762,21 +784,47 @@ def main():
     # Training phases
     print("Starting AdaptiveSLM Training Pipeline")
     print("=" * 50)
-    
-    # Phase 1: Pre-training (use high-quality filtered corpus)
-    # trainer.pretrain("./data/pretrain_corpus.jsonl", num_epochs=1)
-    
-    # Phase 2: Knowledge Distillation
-    # trainer.distill("./data/distill_data.jsonl", num_epochs=1)
-    
-    # Phase 3: PAKD Fine-tuning (our novel contribution)
-    # trainer.pakd_finetune("./data/pakd_data.jsonl", num_epochs=1)
-    
-    # Phase 4: Export to GGUF
-    # trainer.export_gguf("./models/adaptive_slm.gguf")
-    
-    print("\nTraining pipeline ready!")
-    print("Uncomment the training phases above to run them.")
+
+    import argparse
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--phase", type=str, default="all",
+                        choices=["pretrain", "distill", "pakd", "export", "all"],
+                        help="Which training phase to run")
+    parser.add_argument("--data-dir", type=str, default="./data")
+    parser.add_argument("--output-model", type=str, default="./models/adaptive_slm.gguf")
+    args = parser.parse_args()
+
+    data_dir = args.data_dir
+
+    if args.phase in ("pretrain", "all"):
+        print("\n--- Phase 1: Pre-training ---")
+        corpus_path = os.path.join(data_dir, "pretrain_corpus.jsonl")
+        if os.path.exists(corpus_path):
+            trainer.pretrain(corpus_path, num_epochs=1)
+        else:
+            print(f"  Skipping: {corpus_path} not found")
+
+    if args.phase in ("distill", "all"):
+        print("\n--- Phase 2: Knowledge Distillation ---")
+        distill_path = os.path.join(data_dir, "distill_data.jsonl")
+        if os.path.exists(distill_path):
+            trainer.distill(distill_path, num_epochs=1)
+        else:
+            print(f"  Skipping: {distill_path} not found")
+
+    if args.phase in ("pakd", "all"):
+        print("\n--- Phase 3: PAKD Fine-tuning (novel contribution) ---")
+        pakd_path = os.path.join(data_dir, "pakd_data.jsonl")
+        if os.path.exists(pakd_path):
+            trainer.pakd_finetune(pakd_path, num_epochs=1)
+        else:
+            print(f"  Skipping: {pakd_path} not found")
+
+    if args.phase in ("export", "all"):
+        print("\n--- Phase 4: Export to GGUF ---")
+        trainer.export_gguf(args.output_model)
+
+    print("\nTraining pipeline complete.")
 
 if __name__ == "__main__":
     main()
