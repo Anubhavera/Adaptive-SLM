@@ -47,3 +47,8 @@ venv/
 
 # Logs
 *.log
+
+# Large Models
+models/*.gguf
+models/*.bin
+models/*.pt
