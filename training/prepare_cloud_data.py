@@ -16,8 +16,8 @@ def prepare_pretrain_data(output_path, num_samples=100000):
     
     # Use FineWeb-Edu (high quality educational content) + Code
     datasets_to_load = [
-        ("HuggingFaceFW/fineweb-edu", "sample-10BT", "train", 0.7),
-        ("bigcode/the-stack-smol", None, "train", 0.3),
+        ("HuggingFaceFW/fineweb-edu", "sample-10BT", "train", 0.8),
+        ("codeparrot/codeparrot-clean", None, "train", 0.2),
     ]
     
     all_texts = []
@@ -44,7 +44,7 @@ def prepare_distill_data(output_path, num_samples=50000):
     # Mix of instruction following, coding, reasoning, creative
     datasets_to_load = [
         ("tatsu-lab/alpaca", None, "train", 0.25),
-        ("bigcode/the-stack-smol", None, "train", 0.25),
+        ("codeparrot/codeparrot-clean", None, "train", 0.25),
         ("openai/gsm8k", "main", "train", 0.15),
         ("allenai/sciq", None, "train", 0.15),
         ("HuggingFaceH4/ultrachat_200k", None, "train_sft", 0.2),
