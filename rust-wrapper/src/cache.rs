@@ -6,11 +6,11 @@
 //! - Semantic relevance to recent queries
 //! - User profile alignment
 
-use rusqlite::{Connection, params};
+use rusqlite::{Connection, params, params_from_iter};
 use serde::{Deserialize, Serialize};
 use chrono::{DateTime, Utc};
-use std::path::Path;
 use crate::{Result, SLMError};
+use bytemuck;
 
 // ============================================================================
 // Types
@@ -71,8 +71,13 @@ pub struct KnowledgeCache {
 }
 
 impl KnowledgeCache {
-    /// Create or open a cache database
+    /// Create or open a cache database with default config
     pub async fn new(db_path: &str) -> Result<Self> {
+        Self::with_config(db_path, CacheConfig::default()).await
+    }
+
+    /// Create or open a cache database with custom config
+    pub async fn with_config(db_path: &str, config: CacheConfig) -> Result<Self> {
         let conn = Connection::open(db_path)
             .map_err(|e| SLMError::CacheError(e.to_string()))?;
         
@@ -93,19 +98,27 @@ impl KnowledgeCache {
             CREATE INDEX IF NOT EXISTS idx_topic ON knowledge(topic);
             CREATE INDEX IF NOT EXISTS idx_priority ON knowledge(priority_score DESC);
             CREATE INDEX IF NOT EXISTS idx_accessed ON knowledge(last_accessed DESC);
+            
+            -- Virtual table for vector search (created if sqlite-vec is available)
+            -- CREATE VIRTUAL TABLE IF NOT EXISTS knowledge_vec USING vec0(
+            --     embedding FLOAT[384]
+            -- );
         "#).map_err(|e| SLMError::CacheError(e.to_string()))?;
         
-        // Try to load sqlite-vec extension (if available)
-        // Note: This requires the extension to be installed
-        let _ = conn.load_extension_enable();
-        if let Err(e) = conn.load_extension(Path::new("vec0"), None) {
-            tracing::warn!("sqlite-vec not available, using fallback: {}", e);
-            // Fallback: we'll do vector search in Rust
+        // Try to load sqlite-vec extension for native vector search
+        #[cfg(feature = "sqlite-vec")]
+        {
+            let _ = conn.load_extension("sqlite_vec", "sqlite3_vec_init");
+            let _ = conn.execute_batch(r#"
+                CREATE VIRTUAL TABLE IF NOT EXISTS knowledge_vec USING vec0(
+                    embedding FLOAT[384]
+                );
+            "#);
         }
         
         Ok(Self {
             conn,
-            config: CacheConfig::default(),
+            config,
         })
     }
     
@@ -132,6 +145,15 @@ impl KnowledgeCache {
         
         let id = self.conn.last_insert_rowid();
         
+        // Also insert into sqlite-vec table for fast vector search
+        #[cfg(feature = "sqlite-vec")]
+        {
+            self.conn.execute(
+                "INSERT INTO knowledge_vec (rowid, embedding) VALUES (?1, ?2)",
+                params![id, embedding_bytes],
+            ).map_err(|e| SLMError::CacheError(e.to_string()))?;
+        }
+        
         // Evict if over capacity
         self.evict_if_needed().await?;
         
@@ -146,8 +168,15 @@ impl KnowledgeCache {
     ) -> Result<Option<KnowledgeEntry>> {
         let query_embedding = self.compute_embedding(query);
         
-        // Fetch all entries and compute similarity
-        // In production with sqlite-vec, this would be a native vector search
+        // Try sqlite-vec native vector search first (if available)
+        #[cfg(feature = "sqlite-vec")]
+        {
+            if let Ok(entry) = self.search_vec(query_embedding, min_similarity).await {
+                return Ok(Some(entry));
+            }
+        }
+        
+        // Fallback: brute-force O(n) search in Rust
         let mut stmt = self.conn.prepare(
             "SELECT id, topic, content, embedding, priority_score, access_count, created_at, last_accessed, source_url FROM knowledge"
         ).map_err(|e| SLMError::CacheError(e.to_string()))?;
@@ -192,6 +221,58 @@ impl KnowledgeCache {
         }
         
         Ok(None)
+    }
+    
+    /// Native sqlite-vec vector search (when feature enabled)
+    #[cfg(feature = "sqlite-vec")]
+    async fn search_vec(
+        &self,
+        query_embedding: Vec<f32>,
+        min_similarity: f32,
+    ) -> Result<KnowledgeEntry> {
+        use rusqlite::params_from_iter;
+        
+        let embedding_bytes = bytemuck_cast(&query_embedding);
+        
+        let mut stmt = self.conn.prepare(
+            r#"
+            SELECT k.id, k.topic, k.content, k.embedding, k.priority_score, 
+                   k.access_count, k.created_at, k.last_accessed, k.source_url,
+                   distance
+            FROM knowledge_vec v
+            JOIN knowledge k ON k.rowid = v.rowid
+            WHERE v.embedding MATCH ?1
+            AND distance <= ?2
+            ORDER BY distance ASC
+            LIMIT 1
+            "#
+        ).map_err(|e| SLMError::CacheError(e.to_string()))?;
+        
+        // sqlite-vec MATCH takes embedding as blob, distance as float
+        let entry = stmt.query_row(
+            params_from_iter([embedding_bytes, (1.0 - min_similarity).to_string()]),
+            |row| {
+                let embedding_bytes: Vec<u8> = row.get(3)?;
+                let embedding = bytemuck_from(&embedding_bytes);
+                
+                Ok(KnowledgeEntry {
+                    id: row.get(0)?,
+                    topic: row.get(1)?,
+                    content: row.get(2)?,
+                    embedding,
+                    priority_score: row.get(4)?,
+                    access_count: row.get(5)?,
+                    created_at: row.get::<_, String>(6)?.parse().unwrap_or_else(|_| Utc::now()),
+                    last_accessed: row.get::<_, String>(7)?.parse().unwrap_or_else(|_| Utc::now()),
+                    source_url: row.get(8).ok(),
+                })
+            }
+        ).map_err(|e| SLMError::CacheError(e.to_string()))?;
+        
+        // Update access tracking
+        self.update_access(entry.id).await?;
+        
+        Ok(entry)
     }
     
     /// Update access count and recency
@@ -295,10 +376,17 @@ impl KnowledgeCache {
             [],
             |row| row.get(0),
         ).map_err(|e| SLMError::CacheError(e.to_string()))?;
-        
+
+        let avg_access_count: f32 = self.conn.query_row(
+            "SELECT COALESCE(AVG(access_count), 0) FROM knowledge",
+            [],
+            |row| row.get(0),
+        ).map_err(|e| SLMError::CacheError(e.to_string()))?;
+
         Ok(CacheStats {
-            entry_count: count as usize,
+            total_entries: count as usize,
             avg_priority,
+            avg_access_count,
             max_entries: self.config.max_entries,
         })
     }
@@ -357,8 +445,9 @@ impl KnowledgeCache {
 
 #[derive(Debug)]
 pub struct CacheStats {
-    pub entry_count: usize,
+    pub total_entries: usize,
     pub avg_priority: f32,
+    pub avg_access_count: f32,
     pub max_entries: usize,
 }
 
@@ -392,11 +481,13 @@ fn normalize(v: &mut [f32]) {
 }
 
 fn bytemuck_cast(v: &[f32]) -> Vec<u8> {
-    v.iter().flat_map(|f| f.to_le_bytes()).collect()
+    bytemuck::cast_slice(v).to_vec()
 }
 
 fn bytemuck_from(bytes: &[u8]) -> Vec<f32> {
-    bytes.chunks_exact(4)
-        .map(|chunk| f32::from_le_bytes([chunk[0], chunk[1], chunk[2], chunk[3]]))
-        .collect()
+    bytemuck::try_cast_slice(bytes)
+        .map(|s| s.to_vec())
+        .unwrap_or_else(|_| bytes.chunks_exact(4)
+            .map(|chunk| f32::from_le_bytes([chunk[0], chunk[1], chunk[2], chunk[3]]))
+            .collect())
 }

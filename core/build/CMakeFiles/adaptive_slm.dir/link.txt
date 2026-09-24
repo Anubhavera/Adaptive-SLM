@@ -1,2 +1,0 @@
-/usr/bin/ar qc libadaptive_slm.a CMakeFiles/adaptive_slm.dir/src/inference.cpp.o CMakeFiles/adaptive_slm.dir/src/context_adapt.cpp.o CMakeFiles/adaptive_slm.dir/src/embeddings.cpp.o CMakeFiles/adaptive_slm.dir/src/user_profile.cpp.o
-/usr/bin/ranlib libadaptive_slm.a

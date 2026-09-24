@@ -51,6 +51,13 @@ pub enum aslm_expertise_level {
     Expert = 3,
 }
 
+/// Token streaming callback. Return `true` to continue, `false` to stop early.
+pub type aslm_token_callback = unsafe extern "C" fn(
+    token_text: *const c_char,
+    token_count: c_int,
+    user_data: *mut libc::c_void,
+) -> bool;
+
 #[link(name = "adaptive_slm")]
 extern "C" {
     pub fn aslm_default_init_params() -> aslm_init_params;
@@ -88,4 +95,12 @@ extern "C" {
         ctx: *mut aslm_context,
         profile: *const aslm_user_profile,
     );
+
+    pub fn aslm_generate_stream(
+        ctx: *mut aslm_context,
+        prompt: *const c_char,
+        params: *const aslm_gen_params,
+        callback: aslm_token_callback,
+        user_data: *mut libc::c_void,
+    ) -> i32;
 }

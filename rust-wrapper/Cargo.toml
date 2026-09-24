@@ -21,8 +21,14 @@ reqwest = { version = "0.11", features = ["json", "rustls-tls"], default-feature
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 
-# SQLite with vector extension
+# SQLite
 rusqlite = { version = "0.30", features = ["bundled"] }
+
+# sqlite-vec extension for vector search (optional)
+sqlite-vec = { version = "0.1", optional = true }
+
+# URL encoding for search queries
+urlencoding = "2"
 
 # Logging
 tracing = "0.1"
@@ -37,6 +43,13 @@ libc = "0.2"
 
 # Time utilities
 chrono = { version = "0.4", features = ["serde"] }
+
+# By-muck for binary serialization
+bytemuck = "1"
+
+[features]
+default = []
+sqlite-vec = ["sqlite-vec", "rusqlite/load_extension"]
 
 [build-dependencies]
 cc = "1.0"

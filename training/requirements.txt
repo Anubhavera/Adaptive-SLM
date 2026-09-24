@@ -8,7 +8,7 @@ accelerate>=0.25.0
 
 # Memory Optimization
 bitsandbytes>=0.41.0         # 4-bit quantization for teacher
-flash-attn>=2.4.0            # Flash attention (optional, needs CUDA)
+# flash-attn>=2.4.0            # Flash attention (optional, needs CUDA)
 
 # Data Processing
 tokenizers>=0.15.0

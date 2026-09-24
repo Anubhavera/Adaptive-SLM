@@ -527,10 +527,14 @@ class AdaptiveSLMTrainer:
         self.teacher_model = AutoModelForCausalLM.from_pretrained(
             self.config.teacher_model,
             quantization_config=bnb_config,
-            device_map="auto",
+            device_map={"": self.device},  # Force to single device
             torch_dtype=torch.bfloat16
         )
         self.teacher_model.eval()
+        
+        # Disable gradient for teacher
+        for param in self.teacher_model.parameters():
+            param.requires_grad = False
         
         print("Teacher model loaded")
     
@@ -575,24 +579,31 @@ class AdaptiveSLMTrainer:
                     )
                     loss = outputs["loss"]
                 
+                # Gradient accumulation
+                loss = loss / self.config.gradient_accumulation_steps
+                
                 if scaler:
                     scaler.scale(loss).backward()
-                    if (batch_idx + 1) % self.config.gradient_accumulation_steps == 0:
-                        scaler.step(optimizer)
-                        scaler.update()
-                        optimizer.zero_grad()
-                        scheduler.step()
                 else:
                     loss.backward()
-                    if (batch_idx + 1) % self.config.gradient_accumulation_steps == 0:
+                
+                if (batch_idx + 1) % self.config.gradient_accumulation_steps == 0:
+                    if scaler:
+                        scaler.unscale_(optimizer)
+                        torch.nn.utils.clip_grad_norm_(self.model.parameters(), 1.0)
+                        scaler.step(optimizer)
+                        scaler.update()
+                    else:
+                        torch.nn.utils.clip_grad_norm_(self.model.parameters(), 1.0)
                         optimizer.step()
-                        optimizer.zero_grad()
-                        scheduler.step()
+                    
+                    optimizer.zero_grad()
+                    scheduler.step()
                 
                 global_step += 1
                 
                 if global_step % 100 == 0:
-                    print(f"Step {global_step}, Loss: {loss.item():.4f}")
+                    print(f"Step {global_step}, Loss: {loss.item() * self.config.gradient_accumulation_steps:.4f}")
                 
                 if global_step >= self.config.max_steps:
                     break
@@ -607,7 +618,7 @@ class AdaptiveSLMTrainer:
             self.load_teacher()
         
         dataset = AdaptiveSLMDataset(data_path, self.tokenizer, profile_enabled=False)
-        dataloader = DataLoader(dataset, batch_size=self.config.batch_size // 2)  # Smaller batch for teacher
+        dataloader = DataLoader(dataset, batch_size=self.config.batch_size // 2)
         
         kd_loss_fn = KnowledgeDistillationLoss(
             alpha=self.config.distillation_alpha,
@@ -616,10 +627,18 @@ class AdaptiveSLMTrainer:
         
         optimizer = torch.optim.AdamW(
             self.model.parameters(),
-            lr=self.config.learning_rate * 0.1  # Lower LR for distillation
+            lr=self.config.learning_rate * 0.1,
+            weight_decay=self.config.weight_decay
         )
         
+        scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
+            optimizer, T_max=len(dataloader) * num_epochs
+        )
+        
+        scaler = torch.cuda.amp.GradScaler() if self.config.use_mixed_precision else None
+        
         self.model.train()
+        global_step = 0
         
         for epoch in range(num_epochs):
             for batch_idx, batch in enumerate(dataloader):
@@ -649,12 +668,34 @@ class AdaptiveSLMTrainer:
                         self.config.vocab_size
                     )
                 
-                loss.backward()
-                optimizer.step()
-                optimizer.zero_grad()
+                # Gradient accumulation
+                loss = loss / self.config.gradient_accumulation_steps
                 
-                if batch_idx % 100 == 0:
-                    print(f"Distillation Step {batch_idx}, Loss: {loss.item():.4f}")
+                if scaler:
+                    scaler.scale(loss).backward()
+                else:
+                    loss.backward()
+                
+                if (batch_idx + 1) % self.config.gradient_accumulation_steps == 0:
+                    if scaler:
+                        scaler.unscale_(optimizer)
+                        torch.nn.utils.clip_grad_norm_(self.model.parameters(), 1.0)
+                        scaler.step(optimizer)
+                        scaler.update()
+                    else:
+                        torch.nn.utils.clip_grad_norm_(self.model.parameters(), 1.0)
+                        optimizer.step()
+                    
+                    optimizer.zero_grad()
+                    scheduler.step()
+                
+                global_step += 1
+                
+                if global_step % 50 == 0:
+                    print(f"Distillation Step {global_step}, Loss: {loss.item() * self.config.gradient_accumulation_steps:.4f}")
+                
+                if global_step >= self.config.max_steps:
+                    break
         
         self.save_checkpoint("distilled")
     
@@ -676,10 +717,18 @@ class AdaptiveSLMTrainer:
         
         optimizer = torch.optim.AdamW(
             self.model.parameters(),
-            lr=self.config.learning_rate * 0.05
+            lr=self.config.learning_rate * 0.05,
+            weight_decay=self.config.weight_decay
         )
         
+        scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
+            optimizer, T_max=len(dataloader) * num_epochs
+        )
+        
+        scaler = torch.cuda.amp.GradScaler() if self.config.use_mixed_precision else None
+        
         self.model.train()
+        global_step = 0
         
         for epoch in range(num_epochs):
             for batch_idx, batch in enumerate(dataloader):
@@ -713,12 +762,34 @@ class AdaptiveSLMTrainer:
                         self.config.vocab_size
                     )
                 
-                loss.backward()
-                optimizer.step()
-                optimizer.zero_grad()
+                # Gradient accumulation
+                loss = loss / self.config.gradient_accumulation_steps
                 
-                if batch_idx % 100 == 0:
-                    print(f"PAKD Step {batch_idx}, Loss: {loss.item():.4f}")
+                if scaler:
+                    scaler.scale(loss).backward()
+                else:
+                    loss.backward()
+                
+                if (batch_idx + 1) % self.config.gradient_accumulation_steps == 0:
+                    if scaler:
+                        scaler.unscale_(optimizer)
+                        torch.nn.utils.clip_grad_norm_(self.model.parameters(), 1.0)
+                        scaler.step(optimizer)
+                        scaler.update()
+                    else:
+                        torch.nn.utils.clip_grad_norm_(self.model.parameters(), 1.0)
+                        optimizer.step()
+                    
+                    optimizer.zero_grad()
+                    scheduler.step()
+                
+                global_step += 1
+                
+                if global_step % 50 == 0:
+                    print(f"PAKD Step {global_step}, Loss: {loss.item() * self.config.gradient_accumulation_steps:.4f}")
+                
+                if global_step >= self.config.max_steps:
+                    break
         
         self.save_checkpoint("pakd_finetuned")
     

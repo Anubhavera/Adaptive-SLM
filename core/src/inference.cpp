@@ -39,6 +39,7 @@ struct Context {
 static llama_sampler* create_sampler(const aslm_gen_params* params) {
     auto* smpl = llama_sampler_chain_init(llama_sampler_chain_default_params());
     llama_sampler_chain_add(smpl, llama_sampler_init_penalties(
+        64,                       // penalty_last_n: look back 64 tokens
         params->repeat_penalty,   // penalty_repeat
         0.0f,                     // penalty_freq
         0.0f                      // penalty_present
@@ -120,7 +121,7 @@ aslm_context* aslm_init(const aslm_init_params* params) {
         std::cout << "[ASLM] Model loaded successfully\n";
         std::cout << "[ASLM] Context size: " << params->max_context << " tokens\n";
         std::cout << "[ASLM] Threads: " << cparams.n_threads << "\n";
-        std::cout << "[ASLM] Vocab size: " << llama_model_n_vocab(ctx->model) << "\n";
+        std::cout << "[ASLM] Vocab size: " << llama_vocab_n_tokens(llama_model_get_vocab(ctx->model)) << "\n";
     }
 
     return reinterpret_cast<aslm_context*>(ctx);
@@ -160,12 +161,18 @@ int32_t aslm_generate(
         return -1;
     }
 
-    // Build full prompt with profile modifier
+    // Build prompt in ChatML format (Qwen2/Qwen2.5 native format)
+    // System message carries profile modifier; user message carries the actual prompt
     std::string full_prompt;
     if (ctx->user_profile) {
-        full_prompt = ctx->user_profile->getPromptModifier();
+        std::string modifier = ctx->user_profile->getPromptModifier();
+        if (!modifier.empty()) {
+            full_prompt += "<|im_start|>system\n" + modifier + "<|im_end|>\n";
+        }
     }
+    full_prompt += "<|im_start|>user\n";
     full_prompt += prompt;
+    full_prompt += "<|im_end|>\n<|im_start|>assistant\n";
 
     const llama_vocab* vocab = llama_model_get_vocab(ctx->model);
 
@@ -198,7 +205,7 @@ int32_t aslm_generate(
     }
 
     // Clear KV cache for fresh generation
-    llama_kv_cache_clear(ctx->llama_ctx);
+    llama_kv_self_clear(ctx->llama_ctx);
 
     // Free previous sampler if any, create new one with current params
     if (ctx->sampler) {
@@ -314,9 +321,14 @@ int32_t aslm_generate_stream(
 
     std::string full_prompt;
     if (ctx->user_profile) {
-        full_prompt = ctx->user_profile->getPromptModifier();
+        std::string modifier = ctx->user_profile->getPromptModifier();
+        if (!modifier.empty()) {
+            full_prompt += "<|im_start|>system\n" + modifier + "<|im_end|>\n";
+        }
     }
+    full_prompt += "<|im_start|>user\n";
     full_prompt += prompt;
+    full_prompt += "<|im_end|>\n<|im_start|>assistant\n";
 
     const llama_vocab* vocab = llama_model_get_vocab(ctx->model);
 
@@ -334,7 +346,7 @@ int32_t aslm_generate_stream(
     int effective_ctx = std::min(n_ctx, ctx->current_context_size);
     if (n_prompt_tokens >= effective_ctx) return -1;
 
-    llama_kv_cache_clear(ctx->llama_ctx);
+    llama_kv_self_clear(ctx->llama_ctx);
 
     if (ctx->sampler) llama_sampler_free(ctx->sampler);
     ctx->sampler = aslm::create_sampler(params);

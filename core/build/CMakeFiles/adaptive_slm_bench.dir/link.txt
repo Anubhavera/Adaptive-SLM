@@ -1,1 +1,0 @@
-/usr/bin/c++ -O3 -march=native -fno-finite-math-only -DNDEBUG CMakeFiles/adaptive_slm_bench.dir/benchmark/bench.cpp.o -o adaptive_slm_bench  libadaptive_slm.a _deps/ggml-build/src/libggml.a -ldl _deps/ggml-build/src/libggml-cpu.a _deps/ggml-build/src/libggml-base.a -lm /usr/lib/gcc/x86_64-linux-gnu/13/libgomp.a /usr/lib/x86_64-linux-gnu/libpthread.a 

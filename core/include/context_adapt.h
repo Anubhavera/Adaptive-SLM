@@ -53,19 +53,20 @@ public:
      */
     void reset();
     
+    /**
+     * Compute resource availability score [0, 1]
+     * Public so unit tests can verify scoring independently.
+     */
+    float computeResourceScore(const aslm_device_state& state) const;
+
     // Getters
     int32_t getCurrentContextSize() const { return current_context_; }
     const ACCConfig& getConfig() const { return config_; }
-    
+
 private:
     ACCConfig config_;
     int32_t current_context_;
-    float ema_factor_ = 0.3f;  // Exponential moving average factor
-    
-    /**
-     * Compute resource availability score [0, 1]
-     */
-    float computeResourceScore(const aslm_device_state& state) const;
+    float ema_factor_ = 0.3f;
 };
 
 /**

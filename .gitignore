@@ -3,7 +3,6 @@
 Thumbs.db
 ehthumbs.db
 Desktop.ini
-core/
 
 # IDE/editor settings
 .vscode/
@@ -12,15 +11,14 @@ core/
 *~
 
 # Build artifacts
-/build/
-/build_*/
-/build-*/
 core/build/
 core/build_*/
-build_new/
+/build/
+/build_*/
 CMakeFiles/
 CMakeCache.txt
 cmake_install.cmake
+compile_commands.json
 Makefile
 *.o
 *.obj
@@ -31,6 +29,10 @@ Makefile
 *.dylib
 *.exe
 *.pdb
+ninja.build
+
+# llama.cpp fetched dependency (large, re-fetched by cmake)
+core/build/_deps/
 
 # Rust
 **/target/
@@ -44,11 +46,18 @@ __pycache__/
 .venv/
 venv/
 .env
+data/
 
 # Logs
 *.log
 
-# Large Models
+# Large model files
 models/*.gguf
 models/*.bin
 models/*.pt
+models/*.ggml
+models/.cache/
+
+# Claude Code session artifacts
+.claude/worktrees/
+*.resolved
