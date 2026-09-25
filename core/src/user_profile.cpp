@@ -61,11 +61,19 @@ float UserProfile::computeRelevance(
         static_cast<int32_t>(topic_embedding.size())
     );
     
+    // Interest score: cosine rescaled so a typical containment match
+    // (~0.75) maps to 0.9 — the score rust-wrapper/src/profile.rs gives
+    // for a substring interest match. No overlap -> 0.
+    float interest_score = std::clamp(max_sim / 0.75f, 0.0f, 1.0f);
+    
+    // Background score: 0.3 prior with no evidence (mirrors rust-wrapper)
+    float bg_score = std::clamp(0.3f + 0.7f * bg_sim, 0.0f, 1.0f);
+    
     // Combine: 70% interest match, 30% background match
-    float relevance = 0.7f * max_sim + 0.3f * bg_sim;
+    float relevance = 0.7f * interest_score + 0.3f * bg_score;
     
     // Normalize to [0, 1]
-    return std::clamp((relevance + 1.0f) / 2.0f, 0.0f, 1.0f);
+    return std::clamp(relevance, 0.0f, 1.0f);
 }
 
 std::string UserProfile::getPromptModifier() const {

@@ -6,7 +6,7 @@
 //! - Semantic relevance to recent queries
 //! - User profile alignment
 
-use rusqlite::{Connection, params, params_from_iter};
+use rusqlite::{Connection, params};
 use serde::{Deserialize, Serialize};
 use chrono::{DateTime, Utc};
 use crate::{Result, SLMError};

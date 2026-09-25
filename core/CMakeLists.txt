@@ -25,7 +25,7 @@ include(FetchContent)
 FetchContent_Declare(
     llama_cpp
     GIT_REPOSITORY https://github.com/ggerganov/llama.cpp.git
-    GIT_TAG b5233
+    GIT_TAG b5260
     GIT_SHALLOW TRUE
 )
 FetchContent_MakeAvailable(llama_cpp)
@@ -83,11 +83,11 @@ if(NOT MSVC)
     check_cxx_compiler_flag("-mfpu=neon" COMPILER_SUPPORTS_NEON)
 
     if(COMPILER_SUPPORTS_AVX2)
-        set(SIMD_COMPILE_OPTIONS "-mavx2 -mfma")
+        set(SIMD_COMPILE_OPTIONS -mavx2 -mfma)
         set(SIMD_DEFINITIONS "ASLM_USE_AVX2=1")
         message(STATUS "AVX2 support enabled for adaptive_slm embeddings")
     elseif(COMPILER_SUPPORTS_NEON)
-        set(SIMD_COMPILE_OPTIONS "-mfpu=neon")
+        set(SIMD_COMPILE_OPTIONS -mfpu=neon)
         set(SIMD_DEFINITIONS "ASLM_USE_NEON=1")
         message(STATUS "NEON support enabled for adaptive_slm embeddings")
     endif()

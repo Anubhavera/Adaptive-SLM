@@ -3,6 +3,7 @@
  */
 
 #include "user_profile.h"
+#include "embeddings.h"
 #include <cassert>
 #include <cstdio>
 #include <cstring>
@@ -144,7 +145,7 @@ static void test_json_serialization() {
     
     if (json.find("\"age\":30") != std::string::npos &&
         json.find("\"background\":\"researcher\"") != std::string::npos &&
-        json.find("\"expertise\":4") != std::string::npos &&
+        json.find("\"expertise\":3") != std::string::npos &&
         json.find("\"programming\"") != std::string::npos &&
         json.find("\"ai\"") != std::string::npos)
         PASS("json_serialization");
@@ -156,12 +157,12 @@ static void test_json_deserialization() {
     std::string json = R"({"age":28,"background":"designer","expertise":1,"interests":["ui","ux"]})";
     auto p = aslm::UserProfile::fromJson(json);
     
-    if (p.age_ == 28 &&
-        p.background_ == "designer" &&
-        p.expertise_ == ASLM_EXPERTISE_INTERMEDIATE &&
-        p.interests_.size() == 2 &&
-        p.interests_[0] == "ui" &&
-        p.interests_[1] == "ux")
+    if (p.getAge() == 28 &&
+        p.getBackground() == "designer" &&
+        p.getExpertise() == ASLM_EXPERTISE_INTERMEDIATE &&
+        p.getInterests().size() == 2 &&
+        p.getInterests()[0] == "ui" &&
+        p.getInterests()[1] == "ux")
         PASS("json_deserialization");
     else
         FAIL("json_deserialization", "deserialization failed");

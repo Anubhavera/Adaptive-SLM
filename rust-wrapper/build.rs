@@ -41,13 +41,56 @@ fn main() {
     println!("cargo:rustc-link-search=native={}", llama_ggml_dir.display());
     println!("cargo:rustc-link-search=native={}", llama_src_dir.display());
 
-    // Link our shared library first (for FFI), then its dependencies
-    // On Linux: libadaptive_slm.so, on Windows: adaptive_slm.dll, on macOS: libadaptive_slm.dylib
-    println!("cargo:rustc-link-lib=adaptive_slm");
-    println!("cargo:rustc-link-lib=static=llama");
-    println!("cargo:rustc-link-lib=static=ggml");
-    println!("cargo:rustc-link-lib=static=ggml-cpu");
-    println!("cargo:rustc-link-lib=static=ggml-base");
+    // Link the C++ core.
+    // On Linux (shared layout): core/build has libadaptive_slm.so, which itself
+    // NEEDs libllama.so etc. — linking the dylib is sufficient at link time.
+    // On Windows MinGW (static layout): adaptive_slm.dll / libadaptive_slm.a.
+    let core_shared = [
+        build_dir.join("libadaptive_slm.so"),
+        build_dir.join("libadaptive_slm.dylib"),
+        build_dir.join("adaptive_slm.dll"),
+    ]
+    .iter()
+    .any(|p| p.exists());
+
+    if core_shared {
+        println!("cargo:rustc-link-lib=dylib=adaptive_slm");
+    } else {
+        println!("cargo:rustc-link-lib=static=adaptive_slm");
+    }
+
+    // llama.cpp + ggml libs are only needed as static archives when the core
+    // itself was built statically (Windows/Ninja). In the shared layout they
+    // are pulled in at runtime through the core library's NEEDED entries —
+    // linking them here would fail (no archives exist) or duplicate code.
+    for lib in &["llama", "ggml", "ggml-cpu", "ggml-base"] {
+        let found = [
+            build_dir.join(format!("lib{}.a", lib)),
+            build_dir.join(format!("{}.a", lib)),
+            llama_src_dir.join(format!("lib{}.a", lib)),
+            llama_src_dir.join(format!("{}.a", lib)),
+            llama_ggml_dir.join(format!("lib{}.a", lib)),
+            llama_ggml_dir.join(format!("{}.a", lib)),
+        ]
+        .iter()
+        .any(|p| p.exists());
+        if found {
+            println!("cargo:rustc-link-lib=static={}", lib);
+        }
+    }
+
+    // Embed an rpath to the C++ build directory so binaries and test
+    // executables locate libadaptive_slm.so without LD_LIBRARY_PATH
+    // (cargo overwrites LD_LIBRARY_PATH for test binaries, so the [env]
+    // entry in .cargo/config.toml is not sufficient on its own).
+    #[cfg(any(target_os = "linux", target_os = "macos"))]
+    {
+        println!("cargo:rustc-link-arg=-Wl,-rpath,{}", build_dir.display());
+        let bin_dir = build_dir.join("bin");
+        if bin_dir.is_dir() {
+            println!("cargo:rustc-link-arg=-Wl,-rpath,{}", bin_dir.display());
+        }
+    }
 
     // Platform-specific system libraries
     #[cfg(target_os = "windows")]
@@ -67,6 +110,9 @@ fn main() {
         println!("cargo:rustc-link-lib=pthread");
         println!("cargo:rustc-link-lib=dl");
         println!("cargo:rustc-link-lib=m");
+        // The C++ core is written in C++; the shared library already links
+        // libstdc++, but ensure the C++ ABI is present for static layouts.
+        println!("cargo:rustc-link-lib=dylib=stdc++");
     }
 
     #[cfg(target_os = "macos")]

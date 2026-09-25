@@ -1,7 +1,13 @@
 //! User Profile management
 
 use serde::{Deserialize, Serialize};
-use crate::ffi::aslm_expertise_level;
+use std::ffi::CString;
+use std::ptr::NonNull;
+use crate::ffi;
+use crate::{Result, SLMError};
+
+/// Alias for [`ExpertiseLevel`] used by the model-family selector API.
+pub type Expertise = ExpertiseLevel;
 
 /// User profile for personalization
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -20,13 +26,13 @@ pub enum ExpertiseLevel {
     Expert,
 }
 
-impl From<ExpertiseLevel> for aslm_expertise_level {
+impl From<ExpertiseLevel> for ffi::aslm_expertise_level {
     fn from(level: ExpertiseLevel) -> Self {
         match level {
-            ExpertiseLevel::Beginner => aslm_expertise_level::Beginner,
-            ExpertiseLevel::Intermediate => aslm_expertise_level::Intermediate,
-            ExpertiseLevel::Advanced => aslm_expertise_level::Advanced,
-            ExpertiseLevel::Expert => aslm_expertise_level::Expert,
+            ExpertiseLevel::Beginner => ffi::aslm_expertise_level::Beginner,
+            ExpertiseLevel::Intermediate => ffi::aslm_expertise_level::Intermediate,
+            ExpertiseLevel::Advanced => ffi::aslm_expertise_level::Advanced,
+            ExpertiseLevel::Expert => ffi::aslm_expertise_level::Expert,
         }
     }
 }
@@ -149,6 +155,68 @@ impl Default for UserProfile {
             background: String::new(),
             interests: Vec::new(),
             expertise: ExpertiseLevel::Intermediate,
+        }
+    }
+}
+
+/// RAII handle to a user profile allocated in the C++ core
+/// (`aslm_profile_create` / `aslm_profile_free`).
+///
+/// The engine stores a raw pointer when the profile is set
+/// (`aslm_set_user_profile` does not copy), so the handle must stay alive
+/// while the engine uses it. `AdaptiveSLM::set_engine_profile` takes
+/// ownership and keeps the profile alive until it is cleared or the engine
+/// is dropped.
+pub struct CUserProfile {
+    ptr: NonNull<ffi::aslm_user_profile>,
+}
+
+impl CUserProfile {
+    /// Allocate the profile object in the C++ core.
+    pub fn new(profile: &UserProfile) -> Result<Self> {
+        let background = CString::new(profile.background.as_str())
+            .map_err(|_| SLMError::ProfileError("background contains a NUL byte".into()))?;
+
+        let interests: Vec<CString> = profile
+            .interests
+            .iter()
+            .map(|i| CString::new(i.as_str()))
+            .collect::<std::result::Result<_, _>>()
+            .map_err(|_| SLMError::ProfileError("interest contains a NUL byte".into()))?;
+
+        let interest_ptrs: Vec<*const std::ffi::c_char> =
+            interests.iter().map(|s| s.as_ptr()).collect();
+
+        let ptr = unsafe {
+            ffi::aslm_profile_create(
+                profile.age,
+                background.as_ptr(),
+                if interest_ptrs.is_empty() {
+                    std::ptr::null()
+                } else {
+                    interest_ptrs.as_ptr()
+                },
+                interest_ptrs.len() as i32,
+                profile.expertise.into(),
+            )
+        };
+
+        let ptr = NonNull::new(ptr)
+            .ok_or_else(|| SLMError::ProfileError("aslm_profile_create failed".into()))?;
+
+        Ok(Self { ptr })
+    }
+
+    /// Raw pointer to hand to `aslm_set_user_profile`.
+    pub fn as_ptr(&self) -> *const ffi::aslm_user_profile {
+        self.ptr.as_ptr()
+    }
+}
+
+impl Drop for CUserProfile {
+    fn drop(&mut self) {
+        unsafe {
+            ffi::aslm_profile_free(self.ptr.as_ptr());
         }
     }
 }

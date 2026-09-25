@@ -2,13 +2,17 @@
 
 # Core
 torch>=2.1.0
-transformers>=4.36.0
+transformers>=4.51.0           # Qwen3 arch support (tokenizer + 4B teacher)
 datasets>=2.16.0
-accelerate>=0.25.0
+accelerate>=0.34.0             # device_map + bnb support
 
 # Memory Optimization
-bitsandbytes>=0.41.0         # 4-bit quantization for teacher
+bitsandbytes>=0.43.0           # 4-bit quantization for teacher
 # flash-attn>=2.4.0            # Flash attention (optional, needs CUDA)
+
+# Export
+safetensors>=0.4.0             # HF-format model export
+gguf>=0.6.0                    # Required by llama.cpp convert_hf_to_gguf.py
 
 # Data Processing
 tokenizers>=0.15.0
@@ -19,7 +23,6 @@ wandb>=0.16.0                # Experiment tracking
 tensorboard>=2.15.0
 
 # Evaluation
-lm-eval>=0.4.0               # For MMLU evaluation
 rouge-score>=0.1.2
 
 # Utilities

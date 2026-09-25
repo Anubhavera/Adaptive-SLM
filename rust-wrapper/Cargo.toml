@@ -49,7 +49,7 @@ bytemuck = "1"
 
 [features]
 default = []
-sqlite-vec = ["sqlite-vec", "rusqlite/load_extension"]
+sqlite-vec = ["dep:sqlite-vec", "rusqlite/load_extension"]
 
 [build-dependencies]
 cc = "1.0"
