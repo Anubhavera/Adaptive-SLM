@@ -234,8 +234,8 @@ int32_t aslm_generate(
         }
 
         // Detokenize the token
-        char piece[128];
-        int n_piece = llama_token_to_piece(vocab, new_token, piece, sizeof(piece), 0, true);
+        char piece[129];
+        int n_piece = llama_token_to_piece(vocab, new_token, piece, sizeof(piece) - 1, 0, true);
         if (n_piece > 0) {
             result.append(piece, n_piece);
         }
@@ -362,8 +362,8 @@ int32_t aslm_generate_stream(
 
         if (llama_vocab_is_eog(vocab, new_token)) break;
 
-        char piece[128];
-        int n_piece = llama_token_to_piece(vocab, new_token, piece, sizeof(piece), 0, true);
+        char piece[129];
+        int n_piece = llama_token_to_piece(vocab, new_token, piece, sizeof(piece) - 1, 0, true);
         if (n_piece > 0) {
             piece[n_piece] = '\0';
             n_generated++;

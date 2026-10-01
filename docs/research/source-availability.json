@@ -1,0 +1,156 @@
+{
+  "checked_at": "2026-10-01T07:45:31.715539+00:00",
+  "scope": "Public metadata endpoints only; availability does not prove file download, schema or license suitability.",
+  "sources": [
+    {
+      "type": "model",
+      "id": "Qwen/Qwen3-1.7B-Instruct-2507",
+      "public_api_access": false,
+      "error_type": "RepositoryNotFoundError",
+      "status": 401
+    },
+    {
+      "type": "model",
+      "id": "Qwen/Qwen3-1.7B",
+      "public_api_access": true,
+      "sha": "70d244cc86ccca08cf5af4e1e306ecf908b1ad5e",
+      "gated": false,
+      "license": "apache-2.0"
+    },
+    {
+      "type": "model",
+      "id": "Qwen/Qwen3-4B-Instruct-2507",
+      "public_api_access": true,
+      "sha": "cdbee75f17c01a7cc42f958dc650907174af0554",
+      "gated": false,
+      "license": "apache-2.0"
+    },
+    {
+      "type": "model",
+      "id": "Qwen/Qwen3-0.6B",
+      "public_api_access": true,
+      "sha": "c1899de289a04d12100db370d81485cdf75e47ca",
+      "gated": false,
+      "license": "apache-2.0"
+    },
+    {
+      "type": "model",
+      "id": "HuggingFaceTB/SmolLM2-360M-Instruct",
+      "public_api_access": true,
+      "sha": "a10cc1512eabd3dde888204e902eca88bddb4951",
+      "gated": false,
+      "license": "apache-2.0"
+    },
+    {
+      "type": "model",
+      "id": "LiquidAI/LFM2.5-350M",
+      "public_api_access": true,
+      "sha": "9e6c6ccf47cd318696e137d381a7ded8fe4df09f",
+      "gated": false,
+      "license": "other"
+    },
+    {
+      "type": "model",
+      "id": "Qwen/Qwen3.5-0.8B",
+      "public_api_access": true,
+      "sha": "2fc06364715b967f1860aea9cf38778875588b17",
+      "gated": false,
+      "license": "apache-2.0"
+    },
+    {
+      "type": "model",
+      "id": "google/gemma-3-270m-it",
+      "public_api_access": true,
+      "sha": "ac82b4e820549b854eebf28ce6dedaf9fdfa17b3",
+      "gated": "manual",
+      "license": "gemma"
+    },
+    {
+      "type": "dataset",
+      "id": "HuggingFaceFW/fineweb-edu",
+      "public_api_access": true,
+      "sha": "87f09149ef4734204d70ed1d046ddc9ca3f2b8f9",
+      "gated": false,
+      "license": "odc-by"
+    },
+    {
+      "type": "dataset",
+      "id": "codeparrot/codeparrot-clean",
+      "public_api_access": true,
+      "sha": "35a59fb025bc0a102f7d96eac09d145b896d487b",
+      "gated": false,
+      "license": null
+    },
+    {
+      "type": "dataset",
+      "id": "tatsu-lab/alpaca",
+      "public_api_access": true,
+      "sha": "dce01c9b08f87459cf36a430d809084718273017",
+      "gated": false,
+      "license": "cc-by-nc-4.0"
+    },
+    {
+      "type": "dataset",
+      "id": "openai/gsm8k",
+      "public_api_access": true,
+      "sha": "740312add88f781978c0658806c59bc2815b9866",
+      "gated": false,
+      "license": [
+        "mit"
+      ]
+    },
+    {
+      "type": "dataset",
+      "id": "allenai/sciq",
+      "public_api_access": true,
+      "sha": "2c94ad3e1aafab77146f384e23536f97a4849815",
+      "gated": false,
+      "license": [
+        "cc-by-nc-3.0"
+      ]
+    },
+    {
+      "type": "dataset",
+      "id": "HuggingFaceH4/ultrachat_200k",
+      "public_api_access": true,
+      "sha": "8049631c405ae6576f93f445c6b8166f76f5505a",
+      "gated": false,
+      "license": "mit"
+    },
+    {
+      "type": "dataset",
+      "id": "HuggingFaceTB/smol-smoltalk",
+      "public_api_access": true,
+      "sha": "f73fe857d519ff6ac5af2ea67c4d3834da7b8bcc",
+      "gated": false,
+      "license": "apache-2.0"
+    },
+    {
+      "type": "model",
+      "id": "google/functiongemma-270m-it",
+      "checked_at": "2026-10-01T08:37:09.043319+00:00",
+      "public_api_access": true,
+      "sha": "39eccb091651513a5dfb56892d3714c1b5b8276c",
+      "gated": "manual",
+      "license": "gemma"
+    },
+    {
+      "type": "dataset",
+      "id": "google/mobile-actions",
+      "checked_at": "2026-10-01T08:37:10.642221+00:00",
+      "public_api_access": true,
+      "sha": "e920309bc2acbc2e99a5e3201cf37df2b9fd9151",
+      "gated": false,
+      "license": "cc-by-4.0"
+    },
+    {
+      "type": "model",
+      "id": "litert-community/functiongemma-270m-ft-mobile-actions",
+      "checked_at": "2026-10-01T08:37:10.941321+00:00",
+      "public_api_access": true,
+      "sha": "f752a74080682b379823794defdbbdf8c2663609",
+      "gated": "auto",
+      "license": "gemma"
+    }
+  ]
+}

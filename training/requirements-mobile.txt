@@ -1,0 +1,11 @@
+# Versions exercised by the CPU regression suite on 2026-10-01, Python 3.12.
+# Keep the cloud provider's CUDA PyTorch wheel; record it in run_manifest.json.
+# CUDA/T4/P100 compatibility still needs the cloud smoke run.
+transformers==5.18.0
+datasets==5.0.1
+accelerate==1.15.0
+peft==0.21.1
+safetensors==0.8.0
+huggingface-hub==1.33.0
+tokenizers==0.23.2
+pytest==9.1.1

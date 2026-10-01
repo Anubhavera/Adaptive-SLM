@@ -21,6 +21,9 @@ jobs:
       - name: Build
         run: cmake --build core/build --parallel $(nproc)
 
+      - name: Run C++ regression tests
+        run: ctest --test-dir core/build --output-on-failure
+
       - name: Run benchmarks (no model - ACC & SIMD only)
         run: ./core/build/adaptive_slm_bench || true
 

@@ -1,20 +1,18 @@
 # AdaptiveSLM
 
-**Research-Grade On-Device Language Model**
+**Experimental on-device language model and runtime research**
 
-A novel SLM architecture optimized for ultra-low-resource devices (<512MB RAM) with three research contributions:
+This project explores a custom SLM and adaptive runtime. Model quality, Android agent behavior, and sustained phone performance still require evaluation. The three experimental components are:
 
 1. **Profile-Aware Knowledge Distillation (PAKD)** - User-adaptive model specialization
 2. **Adaptive Context Compression (ACC)** - Runtime context window based on device state
 3. **Semantic Cache with Priority Decay (SCPD)** - Intelligent knowledge retention
 
-## Benchmarks
+## Current research and training entry point
 
-| Model | RAM | Tokens/s | MMLU |
-|-------|-----|----------|------|
-| Qwen2.5-0.5B | 600MB | 35 | 43.7% |
-| MobileLLM-125M | 400MB | 45 | 25.6% |
-| **AdaptiveSLM** | **<512MB** | **>40** | **TBD** |
+Read the [2026-10-01 audit and implementation plan](docs/research/2026-10-01-audit-and-plan.md) before interpreting older results. Start cloud training with [training/mobile_baseline.ipynb](training/mobile_baseline.ipynb) and the [training guide](docs/training.md).
+
+On 2026-10-01, the existing local Qwen2.5 GGUF produced 31.9 tokens/s across three short **desktop CPU** generations, with 592.7 MiB peak process RSS. This is neither a phone measurement nor evidence of the custom student's quality. The old benchmark's weight/state estimate cannot establish a 512 MB total app memory claim. No validated custom-student MMLU result is available.
 
 ## Build
 
@@ -110,4 +108,3 @@ Comprehensive documentation is available in the `docs/` directory:
 - [**Architecture**](docs/architecture.md)
 - [**API Reference**](docs/api_reference.md)
 - [**Training Guide**](docs/training.md)
-

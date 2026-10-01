@@ -1,0 +1,9 @@
+# Isolated b5260 converter only. Do not install into the training environment.
+# Reuse the provider's PyTorch via a venv with --system-site-packages.
+transformers==4.51.3
+huggingface-hub==0.36.2
+tokenizers==0.21.4
+sentencepiece==0.2.0
+protobuf==4.25.8
+numpy==1.26.4
+safetensors==0.8.0

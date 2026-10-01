@@ -27,7 +27,7 @@ def run_kaggle_training():
     config.max_length = 512
     config.output_dir = "/kaggle/working/checkpoints"
     config.data_path = "/kaggle/working/data"
-    config.teacher_model = "Qwen/Qwen3-1.7B-Instruct-2507"  # P100 16GB can't fit 4B teacher
+    config.teacher_model = "Qwen/Qwen3-1.7B"  # Official public checkpoint; no 1.7B Instruct-2507 release.
 
     print("=" * 60)
     print("AdaptiveSLM Training - Kaggle Optimized")

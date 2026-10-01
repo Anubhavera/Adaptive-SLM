@@ -29,11 +29,8 @@ void benchmark_memory(aslm_context* ctx) {
     std::cout << "Current state size: " << (usage / 1024.0 / 1024.0) << " MB" << std::endl;
     std::cout << "Model + state size: " << (peak / 1024.0 / 1024.0) << " MB" << std::endl;
 
-    if (peak < 512ULL * 1024 * 1024) {
-        std::cout << "[PASS] Memory target MET (< 512 MB)" << std::endl;
-    } else {
-        std::cout << "[WARN] Model + state exceeds 512 MB (mmap reduces RSS)" << std::endl;
-    }
+    std::cout << "[INFO] Values above are serialized state and weight estimates, in MiB. "
+              << "Measure peak process RSS/PSS during inference to assess app memory." << std::endl;
 }
 
 // ============================================================================

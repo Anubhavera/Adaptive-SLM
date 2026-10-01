@@ -128,20 +128,26 @@ static void test_ema_smoothing() {
     // Saturate toward max
     auto rich = make_state(8.0, 8.0, 0.0f, 1.0f, true);
     int prev = 0;
-    for (int i = 0; i < 20; ++i) {
+    for (int i = 0; i < 40; ++i) {
         prev = acc.getSmoothedContextSize(rich);
     }
-    if (prev < 512) {
-        FAIL("ema_smoothing", "EMA failed to converge toward larger context after 20 iterations");
+    if (prev != cfg.max_context) {
+        FAIL("ema_smoothing", "EMA failed to converge to maximum context after 40 iterations");
         return;
     }
 
-    // Drop suddenly to low resources — EMA should not instantly hit min
+    // Emergency memory pressure bypasses smoothing.
     auto poor = make_state(0.2, 8.0, 0.99f, 0.05f, false);
     int after_drop = acc.getSmoothedContextSize(poor);
-    // After one step EMA should still be above pure minimum
-    // (exact value depends on ema_factor, just check it didn't instantly jump to 128)
-    (void)after_drop; // result validated by no-crash
+    if (after_drop != cfg.min_context) {
+        FAIL("ema_smoothing", "emergency RAM pressure must immediately reach minimum");
+        return;
+    }
+    for (int i = 0; i < 100; ++i) acc.getSmoothedContextSize(rich);
+    if (acc.getCurrentContextSize() != cfg.max_context) {
+        FAIL("ema_smoothing", "context did not recover after memory pressure ended");
+        return;
+    }
     PASS("ema_smoothing");
 }
 

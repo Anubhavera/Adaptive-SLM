@@ -21,6 +21,7 @@ namespace aslm {
 ContextAdapter::ContextAdapter(const ACCConfig& config)
     : config_(config)
     , current_context_(config.base_context)
+    , smoothed_context_(static_cast<float>(config.base_context))
 {}
 
 float ContextAdapter::computeResourceScore(const aslm_device_state& state) const {
@@ -55,8 +56,9 @@ int32_t ContextAdapter::computeContextSize(const aslm_device_state& state) const
     float resource_score = computeResourceScore(state);
     
     // Handle extreme cases
-    float ram_ratio = static_cast<float>(state.available_ram_bytes) / 
-                      static_cast<float>(state.total_ram_bytes);
+    float ram_ratio = state.total_ram_bytes > 0
+        ? static_cast<float>(state.available_ram_bytes) / static_cast<float>(state.total_ram_bytes)
+        : 0.5f;
     
     if (ram_ratio < config_.low_ram_threshold) {
         // Emergency: use minimum context
@@ -88,17 +90,22 @@ int32_t ContextAdapter::computeContextSize(const aslm_device_state& state) const
 int32_t ContextAdapter::getSmoothedContextSize(const aslm_device_state& state) {
     int32_t new_context = computeContextSize(state);
     
-    // Exponential moving average for smooth transitions
-    float smoothed = ema_factor_ * static_cast<float>(new_context) +
-                     (1.0f - ema_factor_) * static_cast<float>(current_context_);
-    
-    current_context_ = static_cast<int32_t>(smoothed);
+    // Keep the continuous EMA separate from the quantized output. Feeding the
+    // snapped value back into the EMA prevents recovery to a larger context.
+    if (state.total_ram_bytes > 0 &&
+        static_cast<double>(state.available_ram_bytes) / state.total_ram_bytes < config_.low_ram_threshold) {
+        smoothed_context_ = static_cast<float>(config_.min_context);
+        current_context_ = config_.min_context;
+        return current_context_;
+    }
+    smoothed_context_ = ema_factor_ * static_cast<float>(new_context) +
+                        (1.0f - ema_factor_) * smoothed_context_;
     
     // Snap to power of 2
     int32_t powers[] = {128, 256, 512, 1024, 2048};
-    int32_t best = 128;
+    int32_t best = config_.min_context;
     for (int32_t p : powers) {
-        if (p <= current_context_) {
+        if (p >= config_.min_context && p <= config_.max_context && p <= smoothed_context_ + 0.5f) {
             best = p;
         }
     }
@@ -109,6 +116,7 @@ int32_t ContextAdapter::getSmoothedContextSize(const aslm_device_state& state) {
 
 void ContextAdapter::reset() {
     current_context_ = config_.base_context;
+    smoothed_context_ = static_cast<float>(config_.base_context);
 }
 
 // ============================================================================

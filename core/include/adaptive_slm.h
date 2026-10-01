@@ -175,12 +175,12 @@ void aslm_set_user_profile(aslm_context* ctx, const aslm_user_profile* profile);
 // ============================================================================
 
 /**
- * Get current memory usage in bytes (llama.cpp state size)
+ * Get serialized llama.cpp state size in bytes. This is not process memory.
  */
 uint64_t aslm_get_memory_usage(const aslm_context* ctx);
 
 /**
- * Get peak memory usage estimate in bytes (state + model weights)
+ * Get state + model weight size estimate in bytes. This is not peak RSS/PSS.
  */
 uint64_t aslm_get_peak_memory_usage(const aslm_context* ctx);
 

@@ -1,0 +1,30 @@
+{
+  "captured_at": "2026-10-01T08:09:24.903038+00:00",
+  "properties": {
+    "ro.product.manufacturer": "samsung",
+    "ro.product.model": "SM-M356B",
+    "ro.product.device": "m35x",
+    "ro.build.version.release": "16",
+    "ro.build.version.sdk": "36",
+    "ro.product.cpu.abilist": "arm64-v8a,armeabi-v7a,armeabi",
+    "ro.soc.manufacturer": "Samsung",
+    "ro.soc.model": "s5e8835",
+    "ro.board.platform": "erd8835",
+    "ro.hardware": "s5e8835"
+  },
+  "memory": {
+    "MemTotal": "5556196 kB",
+    "MemAvailable": "2079016 kB"
+  },
+  "battery": {
+    "AC powered": "false",
+    "USB powered": "true",
+    "status": "4",
+    "level": "90",
+    "scale": "100",
+    "temperature": "297"
+  },
+  "thermal": "IsStatusOverride: false\nThermalEventListeners:\n\tcallbacks: 3\n\tkilled: false\n\tbroadcasts count: -1\nThermalStatusListeners:\n\tcallbacks: 5\n\tkilled: false\n\tbroadcasts count: -1\nThermal Status: 0\nCached temperatures:\n\tTemperature{mValue=0.0, mType=2, mName=SUBBAT, mStatus=0}\n\tTemperature{mValue=34.3, mType=0, mName=AP, mStatus=0}\n\tTemperature{mValue=33.1, mType=5, mName=PA, mStatus=0}\n\tTemperature{mValue=29.7, mType=2, mName=BAT, mStatus=0}\n\tTemperature{mValue=29.7, mType=4, mName=USB, mStatus=0}\n\tTemperature{mValue=32.5, mType=3, mName=SKIN, mStatus=0}\n\tTemperature{mValue=29.7, mType=2, mName=MAINBATRAW, mStatus=0}\nHAL Ready: true\nHAL connection:\n\tThermalHAL 2.0 connected: yes\nCurrent temperatures from HAL:\n\tTemperature{mValue=34.3, mType=0, mName=AP, mStatus=0}\n\tTemperature{mValue=29.7, mType=2, mName=BAT, mStatus=0}\n\tTemperature{mValue=29.7, mType=2, mName=MAINBATRAW, mStatus=0}\n\tTemperature{mValue=33.1, mType=5, mName=PA, mStatus=0}\n\tTemperature{mValue=32.5, mType=3, mName=SKIN, mStatus=0}\n\tTemperature{mValue=0.0, mType=2, mName=SUBBAT, mStatus=0}\n\tTemperature{mValue=29.7, mType=4, mName=USB, mStatus=0}\nCurrent cooling devices from HAL:\nTemperature static thresholds from HAL:\nTemperature headroom thresholds:\n[NaN, 0.8333333, 0.9, 1.0, 1.0666667, 1.3333334, 2.3333333]",
+  "cpu_features": "fp asimd evtstrm aes pmull sha1 sha2 crc32 atomics fphp asimdhp cpuid asimdrdm lrcpc dcpop asimddp",
+  "logical_cpu_count": 8
+}

@@ -1,53 +1,38 @@
-# Training Guide
+# Training guide
 
-AdaptiveSLM uses a specialized training pipeline designed to produce a high-performance SLM (~350M params) from scratch or via distillation.
+Start with the pretrained-model LoRA baseline in [mobile_baseline.ipynb](../training/mobile_baseline.ipynb). The custom student remains experimental. Its cloud memory use and model quality are not validated; the old TPU, training-duration and 512 MB claims should not guide a run. Read the [audit](research/2026-10-01-audit-and-plan.md) for the reasons.
 
-## Hardware Requirements
-- **Preferred**: TPU v5e-8 (Kaggle) - Fastest (~4h total)
-- **Alternative**: 2x T4 GPUs (Kaggle) - Good (~14h total)
-- **Minimum**: 24GB VRAM GPU
+## First Colab or Kaggle run
 
-## Pipeline Overview
+1. Upload `artifacts/adaptive-slm-mobile-starter.zip` and open `training/mobile_baseline.ipynb`. On Kaggle, add the zip as an input dataset.
+2. Select a GPU runtime and enable internet. The notebook checks that the provider's CUDA PyTorch wheel can execute on the assigned GPU. This starter uses one GPU; it does not use a second GPU or TPU.
+3. Install pinned dependencies. Restart the kernel if those packages were already imported. The notebook retains the provider's PyTorch wheel and records its version.
+4. Run source/data preflight, inspect the manifest and filtered sample counts, then run the ten-step training smoke test.
+5. Inspect the merged HF model. Optionally convert it with the isolated, pinned b5260 converter and quantize to Q4_K_M.
+6. Save outputs to persistent storage before ending the session. Local regression tests and CPU export checks passed; the actual free cloud GPU must still pass this notebook.
 
-1.  **Data Preparation**
-    - Filtered web corpus (FineWeb-Edu)
-    - Instruction tuning data (Alpaca/Dolly)
-    - Profile-annotated data for PAKD
+The default SmolLM2-360M model and smol-smoltalk dataset are pinned to immutable revisions. Preflight downloads a local dataset snapshot before sampling; allow several GB of cache and export space. A generic-data smoke test establishes pipeline operation, not agent competence. The source dataset was also used in the model's original post-training and cannot establish fresh held-out generalization.
 
-2.  **Teacher Setup**
-    - We use **Qwen2.5-7B-Instruct** as the teacher.
-    - Loaded in 4-bit quantization to fit in memory while retaining IQ.
+## Continue across free sessions
 
-3.  **Training Phases**
-    - **Phase 1: Pre-training**: Learning general language structure.
-    - **Phase 2: Distillation**: Minimizing KL divergence between Student and Teacher logits.
-    - **Phase 3: PAKD**: Fine-tuning with profile-weighted loss.
+Decide the total `--max-steps` before starting a research run. The ten-step notebook is a separate smoke experiment. For a longer experiment, use a new output directory and a larger planned step count. Save every five or twenty-five steps according to the amount of work you can afford to repeat.
 
-5.  **Quantization**
-    - Export to GGUF format (Q4_K_M) for deployment.
+The latest complete checkpoint includes adapter weights, optimizer, scheduler, RNG and Trainer state. **An adapter or merged model alone is insufficient to resume the same run.** Package it after a checkpoint save completes:
 
-## Running on Kaggle
-
-We provide a complete Jupyter notebook for one-click training on Kaggle.
-
-1.  Upload `kaggle/adaptive_slm_training.ipynb` to Kaggle.
-2.  Select **Accelerator**: TPU v5e-8 or GPU T4 x2.
-3.  Run all cells.
-
-The notebook handles:
-- Dependency installation
-- Dataset streaming (no massive downloads)
-- Teacher model loading
-- Training loop with mixed precision
-- Checkpoint saving
-
-## Profile-Aware Knowledge Distillation (PAKD)
-
-Our custom loss function allows the model to "specialize" during training without separate fine-tuning runs.
-
-```python
-loss = (1 - alpha) * CE_Loss + alpha * KL_Div(Student, Teacher)
-weighted_loss = loss * profile_weight_matrix
+```bash
+python training/bundle_checkpoint.py /path/to/run /path/to/checkpoint-transfer.zip
 ```
 
-This biases the model to perform better on topics relevant to the target profiles (e.g., Coding, Science) while maintaining general capability.
+Download the archive or copy it to persistent storage. In another session, upload the starter and archive, set `CHECKPOINT_ZIP` in the notebook, and use the same model/data revisions, tokenization, seed, batch size, accumulation, learning rate, total steps and pinned package environment. The notebook verifies archive hashes before extracting. The script rejects incompatible manifests and resumes automatically. An already-complete run evaluates and exports without another training step.
+
+Interruptions lose work since the last persisted checkpoint. Ephemeral checkpoints disappear with the runtime even if they were saved successfully. Different GPU models can change numerical results; restoring state does not guarantee bitwise identity across hardware. Keep a fixed GPU type for final reproducibility measurements where possible. These scripts store no service login or credentials.
+
+## Custom app-tool data
+
+Use JSONL records with `messages`: system/user context and a final assistant target. This starter accepts string-valued system, user and assistant messages; represent a tool request as assistant JSON. It does not yet support native `tool` role conversations. Only the final assistant response receives labels. Overlength records are counted and skipped intact. Identical user-question groups stay in one split across personas and alternative answers.
+
+Define the tool schema, negative examples and independent held-out tasks before adapting. Later work must support native tool/result templates, multi-step state and constrained decoding. Increasing training steps cannot substitute for this design.
+
+## If a run fails
+
+Keep the full failing cell output, `run_manifest.json`, GPU name, CUDA/PyTorch versions and last completed checkpoint. Do not replace data, alter dependencies or change teacher precision silently. Conversion uses a separate environment because b5260 dependencies conflict with the new training stack. LFM2.5 and Qwen3.5 need a modern runtime/export path; the starter's b5260 conversion is specifically for SmolLM2.

@@ -1,0 +1,105 @@
+{
+  "date": "2026-10-01",
+  "starting_commit": "2e1edaa4823578eddfda8c4ec8924ae76fcfde10",
+  "python": "3.12.14",
+  "training_packages": {
+    "torch": "2.14.1+cpu",
+    "transformers": "5.18.0",
+    "datasets": "5.0.1",
+    "accelerate": "1.15.0",
+    "peft": "0.21.1",
+    "safetensors": "0.8.0"
+  },
+  "python_tests": {
+    "passed": 9,
+    "scope": "CPU numerical/data and interrupted/resumed tiny LoRA merge/reload"
+  },
+  "native_ctest": {
+    "passed": 4,
+    "fresh_build": true
+  },
+  "real_model_smoke": {
+    "model": "HuggingFaceTB/SmolLM2-360M-Instruct",
+    "revision": "a10cc1512eabd3dde888204e902eca88bddb4951",
+    "data": "synthetic hello fixture; not research evaluation",
+    "completed_stages": [
+      "CPU LoRA update",
+      "evaluation",
+      "checkpoint adapter reload",
+      "HF merge/export",
+      "legacy GGUF tokenizer compatibility staging",
+      "F16 conversion",
+      "Q4_K_M quantization",
+      "desktop native inference",
+      "Android native inference"
+    ],
+    "observed_and_fixed": "Completed-checkpoint Trainer resume previously executed an extra zero-learning-rate step; explicit completion guard now skips training. Local export disk quota resolved by cleaning only audit caches.",
+    "remaining_unverified": [
+      "cloud CUDA",
+      "trained agent quality",
+      "sustained phone performance",
+      "full Android app memory",
+      "Rust tests"
+    ]
+  },
+  "runtime": {
+    "tag": "b5260",
+    "commit": "626083faf73faa54440f934bb1741bf443be91b1",
+    "ndk": "29.0.14206865",
+    "android_api_target": 28,
+    "cpu_arch": "armv8.2-a+dotprod",
+    "openmp": false
+  },
+  "gguf": {
+    "bytes": 270590432,
+    "sha256": "5132db3680880fb70f8ca2f78094710f650380f8bdcea0d5ec143da7fcbf9f1f",
+    "quantization_fallback": "192 of 225 quantized tensors required fallback; label is not uniform 4-bit"
+  },
+  "phone_smoke": {
+    "profile": "phone-profile.json",
+    "threads": 4,
+    "context": 2048,
+    "prompts": 3,
+    "tokens_each": 64,
+    "generation_rate_tokens_per_second_including_prefill": 15.9,
+    "wall_seconds": 12.728993,
+    "max_rss_kib": 394796,
+    "max_rss_mib": 385.54296875,
+    "usb_powered": true,
+    "thermal_status_before": 0,
+    "thermal_status_after": 0,
+    "scope": "native pipeline artifact only, not app or agent benchmark"
+  },
+  "desktop_qwen_artifact": {
+    "reported_state_weight_mib": 462.964,
+    "peak_rss_kib": 606876,
+    "reported_tokens_per_second": 31.9,
+    "scope": "existing local artifact; official provenance not established"
+  },
+  "tokenizer_compatibility": {
+    "checked": true,
+    "fixture": "one user-message canonical generation prefix",
+    "identical_token_ids": true,
+    "tokens": 36,
+    "scope": "SmolLM2 staged metadata only; not other model protocols"
+  },
+  "starter_archive": {
+    "bytes": 27954,
+    "sha256": "566d483880ed0d24194a5a0db15f18aae138718fe81c704f0d47a6cdb32d94a0",
+    "files": 10,
+    "notebook_code_cells_ast_valid": true
+  },
+  "checkpoint_transfer": {
+    "verified_file_hashes": true,
+    "notebook_restore_executed": true,
+    "existing_checkpoint_overwrite_rejected": true,
+    "corrupt_digest_rejected": true,
+    "escaping_path_rejected": true,
+    "archive_bytes": 56080594
+  },
+  "phone_cleanup": {
+    "status": "pending device reconnection",
+    "reason": "ADB no devices/emulators found after benchmark",
+    "temporary_directory": "/data/local/tmp/adaptive-slm-audit-20261001"
+  }
+}

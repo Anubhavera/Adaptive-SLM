@@ -66,6 +66,7 @@ public:
 private:
     ACCConfig config_;
     int32_t current_context_;
+    float smoothed_context_;
     float ema_factor_ = 0.3f;
 };
 

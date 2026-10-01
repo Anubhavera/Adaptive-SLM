@@ -8,14 +8,15 @@ Architecture (modern dense SLM recipe, MobileLLM-style deep-thin + Qwen3 tricks)
 - 30 layers x 768 hidden (deep & thin), GQA 12 Q-heads / 4 KV-heads (head_dim 64)
 - RoPE (theta 1e6), RMSNorm, SwiGLU, tied input/output embeddings
 - Optional immediate block-wise weight sharing (MobileLLM-LS), optional QK-norm
-- Elastic depth (MatFormer-style): aux LM heads at layers 15/22 trained jointly,
-  so depth-30/22/15 prefixes are all valid standalone models -> export a family.
+- Experimental depth exits: aux LM heads at layers 15/22 trained jointly.
+  Export supports depth-30/22/15 prefixes; their quality needs evaluation.
+  This is not MatFormer's nested feed-forward-width construction.
 
-Why no MoE: sub-512MB budget means ~500M params total; MoE needs >=1B active
-params to beat dense (Qwen3 ships dense below 4B). Elastic depth gives the
-"adaptive inference" story instead, and PAKD user profiles pick the depth.
+This custom student is randomly initialized. Training VRAM and total Android
+app memory are unvalidated; parameter count alone does not set either budget.
+Use finetune_mobile.py for the pretrained, resumable baseline.
 
-Phases (each auto-resumes the latest checkpoint, so per-phase processes chain):
+Phases (legacy model-weight restoration is not optimizer/scheduler/RNG resume):
 - pretrain : raw-corpus LM training (pretrain_corpus.jsonl, {"text": ...})
 - distill  : 4-bit teacher KD (distill_data.jsonl, {"messages": [...]})
 - pakd     : profile-aware KD (pakd_data.jsonl, {"messages": [...], "profile": ...})
@@ -71,11 +72,11 @@ class TrainingConfig:
     use_qk_norm: bool = True             # Qwen3-family convention (required for export)
     pair_share: bool = False            # MobileLLM-LS immediate block-wise sharing
 
-    # Elastic depth (MatFormer-style nested model)
+    # Experimental depth exits; distinct from MatFormer nested FFN widths.
     elastic_exit_layers: tuple = (15, 22)
     aux_loss_weight: float = 0.3
 
-    # Sequence/batching (defaults sized for a free-tier T4 16GB)
+    # Legacy sequence/batching defaults; T4 fit is not established.
     max_length: int = 512
     batch_size: int = 16                # pretrain
     distill_batch_size: int = 4         # teacher+student logits don't fit at 16
@@ -140,9 +141,11 @@ class RMSNorm(nn.Module):
         self.eps = eps
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
+        dtype = x.dtype
+        x = x.float()
         variance = x.pow(2).mean(-1, keepdim=True)
         x = x * torch.rsqrt(variance + self.eps)
-        return self.weight * x
+        return self.weight * x.to(dtype)
 
 
 class RotaryEmbedding(nn.Module):
@@ -367,21 +370,35 @@ class DistillationLoss(nn.Module):
 
     def forward(self, student_logits: torch.Tensor, teacher_logits: torch.Tensor,
                 labels: torch.Tensor) -> torch.Tensor:
-        temp = self.temperature
-        # Teachers can have a larger padded vocab; slice to the student's.
-        teacher_logits = teacher_logits[..., : student_logits.size(-1)]
+        losses, counts = self.per_sample(student_logits, teacher_logits, labels)
+        return (losses * counts).sum() / counts.sum().clamp(min=1)
 
-        s = student_logits[:, :-1].float()
-        t = teacher_logits[:, :-1].float()
-        y = labels[:, 1:].contiguous()
+    def per_sample(self, student_logits, teacher_logits, labels):
+        """Masked, token-normalized forward KL; chunk probability work in FP32.
 
-        ce = causal_cross_entropy(student_logits, labels)
-
-        student_lp = F.log_softmax(s / temp, dim=-1)
-        teacher_p = F.softmax(t / temp, dim=-1)
-        kd = F.kl_div(student_lp, teacher_p, reduction="batchmean") * (temp * temp)
-
-        return (1 - self.alpha) * ce + self.alpha * kd
+        Logit KD requires identical token IDs. A larger padded teacher vocabulary
+        is allowed, but slicing cannot align two different tokenizers.
+        """
+        vocab = student_logits.size(-1)
+        if teacher_logits.size(-1) < vocab:
+            raise ValueError("Teacher vocabulary is smaller than the student's")
+        losses, counts = [], []
+        for b in range(student_logits.size(0)):
+            targets = labels[b, 1:]
+            positions = torch.nonzero(targets != -100, as_tuple=True)[0]
+            total = student_logits[b, 0, :1].sum() * 0.0
+            for pos in positions.split(64):
+                s = student_logits[b].index_select(0, pos).float()
+                t = teacher_logits[b, :, :vocab].index_select(0, pos).float()
+                ce = F.cross_entropy(s, targets.index_select(0, pos), reduction="sum")
+                kd = F.kl_div(
+                    F.log_softmax(s / self.temperature, dim=-1),
+                    F.softmax(t / self.temperature, dim=-1), reduction="sum",
+                ) * self.temperature ** 2
+                total = total + (1 - self.alpha) * ce + self.alpha * kd
+            counts.append(positions.numel())
+            losses.append(total / max(positions.numel(), 1))
+        return torch.stack(losses), student_logits.new_tensor(counts)
 
 
 class PAKDLoss(DistillationLoss):
@@ -397,30 +414,15 @@ class PAKDLoss(DistillationLoss):
 
     def forward(self, student_logits: torch.Tensor, teacher_logits: torch.Tensor,
                 labels: torch.Tensor, profile_ids: torch.Tensor) -> torch.Tensor:
-        temp = self.temperature
-        teacher_logits = teacher_logits[..., : student_logits.size(-1)]
-
         bsz = student_logits.size(0)
-        s = student_logits[:, :-1].float()
-        t = teacher_logits[:, :-1].float()
-        y = labels[:, 1:].contiguous()
-        vocab = s.size(-1)
-
-        flat_ce = F.cross_entropy(s.reshape(-1, vocab), y.reshape(-1), ignore_index=-100, reduction="none")
-        valid = (y != -100).reshape(-1)
-        ce_b = (flat_ce * valid).reshape(bsz, -1).sum(1) / valid.reshape(bsz, -1).sum(1).clamp(min=1)
-
-        student_lp = F.log_softmax(s / temp, dim=-1)
-        teacher_p = F.softmax(t / temp, dim=-1)
-        kd_b = F.kl_div(student_lp, teacher_p, reduction="none").sum(-1).mean(1) * (temp * temp)
-
-        per_sample = (1 - self.alpha) * ce_b + self.alpha * kd_b
+        per_sample, counts = self.per_sample(student_logits, teacher_logits, labels)
 
         weights = torch.ones(bsz, device=student_logits.device)
         for pid, name in enumerate(PROFILE_ORDER):
             weights[profile_ids == pid] = float(self.profile_weights.get(name, 1.0))
 
-        return (per_sample * weights).mean()
+        valid = (counts > 0).to(weights.dtype)
+        return (per_sample * weights * valid).sum() / valid.sum().clamp(min=1)
 
 
 # ============================================================================
