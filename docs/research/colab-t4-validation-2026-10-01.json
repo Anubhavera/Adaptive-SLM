@@ -1,0 +1,68 @@
+{
+  "source_commit": "a72de2b4d41a7bf190b5a51d58eb7f46399b6843",
+  "run_type": "ten_step_pipeline_smoke_not_agent_training",
+  "gpu": {
+    "python": "3.12.13 (main, Mar  4 2026, 09:23:07) [GCC 11.4.0]",
+    "torch": "2.11.0+cu128",
+    "cuda": "12.8",
+    "gpu": "Tesla T4",
+    "vram_gib": 14.56317138671875,
+    "compute_capability": [
+      7,
+      5
+    ],
+    "bf16": true,
+    "bf16_native": false
+  },
+  "metrics": {
+    "epoch": 0.03210272873194221,
+    "eval_loss": 0.7863537073135376,
+    "eval_runtime": 6.8349,
+    "eval_samples_per_second": 9.364,
+    "eval_steps_per_second": 9.364,
+    "peak_cuda_allocated_bytes": 1144997888,
+    "peak_cuda_reserved_bytes": 1962934272
+  },
+  "data": {
+    "read": 2000,
+    "duplicates": 0,
+    "overlength": 1313,
+    "train": 623,
+    "validation": 64,
+    "tokenized_sha256": "4d871eb39e8c6efb1a6be8a3218b2f0976a3e3179d9d51bfd40d97e5840c2490"
+  },
+  "checkpoint_step": 10,
+  "packages": {
+    "torch": "2.11.0+cu128",
+    "transformers": "5.18.0",
+    "datasets": "5.0.1",
+    "accelerate": "1.15.0",
+    "peft": "0.21.1",
+    "torchao": "0.17.0"
+  },
+  "local_archive_verification": {
+    "sha256": "408931f35c5be81236d09a08a75a1bc0b8bdd9bf67189c1840ec5dbc31e1f1ab",
+    "bytes": 804337993,
+    "crc_and_all_member_sha256": "passed"
+  },
+  "checkpoint_verification": {
+    "global_step": 10,
+    "crc_and_all_member_sha256": "passed",
+    "required_resume_files": [
+      "optimizer.pt",
+      "scheduler.pt",
+      "rng_state.pth",
+      "scaler.pt",
+      "adapter_model.safetensors",
+      "adapter_config.json",
+      "trainer_state.json"
+    ]
+  },
+  "runtime_cleanup": {
+    "user_approved": true,
+    "action": "Disconnect and delete runtime",
+    "verified_ui": "Reconnect T4 / Click to connect",
+    "recorded_at_utc": "2026-10-01T11:10:23.691270+00:00",
+    "local_outputs_preserved": true
+  }
+}

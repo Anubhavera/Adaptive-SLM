@@ -58,6 +58,9 @@ models/*.pt
 models/*.ggml
 models/.cache/
 
+# Downloaded cloud checkpoints and model weights (keep evidence in docs/research)
+artifacts/cloud-runs/
+
 # Claude Code session artifacts
 .claude/worktrees/
 *.resolved

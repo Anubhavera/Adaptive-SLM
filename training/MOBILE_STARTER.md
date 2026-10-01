@@ -1,17 +1,21 @@
 # AdaptiveSLM mobile training starter
 
-Validated locally on 2026-10-01. This is a short pretrained-model LoRA pipeline check, not a trained phone agent. A merged/quantized SmolLM2 smoke artifact ran on the authorized Galaxy M35 native CPU runtime. Colab/Kaggle CUDA execution and full-app/agent evaluation remain unverified.
+Validated locally and on a free Colab T4 on 2026-10-01. This is a short pretrained-model LoRA pipeline check, not a trained phone agent. The cloud run completed ten steps and exported an adapter, merged weights and a full checkpoint; its downloaded archive passed CRC and file-hash checks. A separate earlier merged/quantized SmolLM2 smoke artifact ran on the authorized Galaxy M35 native CPU runtime. Kaggle CUDA execution and full-app/agent evaluation remain unverified. See `docs/research/colab-t4-validation-2026-10-01.json` in the repository for the cloud record.
 
 ## Use on Colab or Kaggle
 
 1. Open `mobile_baseline.ipynb` from this archive. Upload the original `adaptive-slm-mobile-starter.zip` too; on Kaggle, attach it as an input dataset.
-2. Select a GPU and enable internet. Set `STARTER_ZIP` if the notebook cannot find exactly one archive.
+2. Select a GPU and enable internet. For the tested Colab path, select runtime image **2026.07** (Python 3.12 / PyTorch 2.11 / T4). Set `STARTER_ZIP` if the notebook cannot find exactly one archive.
 3. Run the extraction/install cell. If dependencies were already imported, restart the kernel and rerun that cell before continuing.
 4. Run CUDA validation, offline regression tests and pinned model/data preflight. Inspect filtered counts and the manifest before the ten-step training run.
 5. Inspect merged-model output, then optionally convert/quantize in the separate converter environment.
 6. Download `checkpoint-transfer.zip` and the desired model outputs before the ephemeral runtime ends. A zip saved only on runtime disk will be lost with that disk.
 
 Python 3.12 was tested. The notebook retains the provider's CUDA PyTorch wheel; GPU/kernel compatibility must pass the smoke cells. This is a single-GPU recipe. Allow several GB of disk for dataset cache, HF weights, merged weights, staging and GGUF exports. It does not use hosted inference or paid teacher calls.
+
+The Colab image's preinstalled TorchAO 0.10 breaks PEFT 0.21 even for ordinary LoRA. The tested recipe updates it to 0.17 with PyTorch 2.11; `requirements-colab-t4.txt` records that combination. Do not assume it applies to another runtime image. The T4 uses FP16: recent PyTorch probes can report emulated BF16 support, so the script explicitly requires native BF16. Precision is recorded and must match when resuming. Optional TorchAO kernels for newer GPU architectures can emit load warnings; this recipe uses ordinary LoRA and SDPA.
+
+`colab_managed_smoke.ipynb` in the repository is a source copy of the browser-managed, GitHub-cloning run. It pins commit `a72de2b` and verifies training-file hashes. The standalone zip notebook remains the portable Colab/Kaggle entry point. Rebuild the archive after edits with `python training/build_mobile_starter.py`.
 
 ## Resume a planned experiment
 

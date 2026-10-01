@@ -1,0 +1,21 @@
+{
+  "source_commit": "a72de2b4d41a7bf190b5a51d58eb7f46399b6843",
+  "start_step": 5,
+  "final_step": 10,
+  "same_runtime_same_gpu": true,
+  "different_session_tested": false,
+  "exact_tensor_equality": true,
+  "allclose_rtol": 0.00001,
+  "allclose_atol": 0.000001,
+  "allclose_passed": true,
+  "max_absolute_adapter_difference": 0,
+  "resumed_eval": {
+    "epoch": 0.03210272873194221,
+    "eval_loss": 0.7863537073135376,
+    "eval_runtime": 7.8311,
+    "eval_samples_per_second": 8.173,
+    "eval_steps_per_second": 8.173,
+    "peak_cuda_allocated_bytes": 1146832896,
+    "peak_cuda_reserved_bytes": 2141192192
+  }
+}
