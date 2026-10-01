@@ -154,6 +154,9 @@ def main():
     train, evaluation, stats = prepare_splits(
         load_rows(args, dataset_revision), tokenizer, args.max_length, args.eval_fraction, args.seed,
     )
+    # New PyTorch versions include emulated BF16 in the default support probe.
+    # A T4 (SM 7.5) needs FP16 here; require native BF16 for the training path.
+    bf16 = not args.cpu and torch.cuda.is_available() and torch.cuda.is_bf16_supported(including_emulation=False)
     manifest = {
         "model": args.model, "model_revision": model_revision,
         "dataset": args.data or args.dataset, "dataset_revision": dataset_revision,
@@ -161,6 +164,7 @@ def main():
         "max_length": args.max_length, "rank": args.rank, "seed": args.seed,
         "batch_size": args.batch_size, "grad_accum": args.grad_accum, "lr": args.lr,
         "max_steps": args.max_steps, "data": stats,
+        "precision": "float32" if args.cpu else ("bfloat16" if bf16 else "float16"),
         "packages": {p: importlib.metadata.version(p) for p in
                      ["torch", "transformers", "datasets", "accelerate", "peft", "safetensors"]},
         "cuda": torch.version.cuda,
@@ -176,7 +180,7 @@ def main():
     if manifest_path.exists():
         old = json.loads(manifest_path.read_text())
         for key in ["model", "model_revision", "dataset_revision", "max_length", "rank", "seed", "data",
-                    "batch_size", "grad_accum", "lr", "max_steps", "packages"]:
+                    "batch_size", "grad_accum", "lr", "max_steps", "precision", "packages"]:
             if old.get(key) != manifest[key]:
                 raise ValueError(f"Run changed at {key}; use a new output directory for a new experiment")
         if not checkpoint:
@@ -184,7 +188,6 @@ def main():
     elif checkpoint:
         raise ValueError("Checkpoint has no run manifest; use a new output directory")
     manifest_path.write_text(json.dumps(manifest, indent=2), encoding="utf-8")
-    bf16 = not args.cpu and torch.cuda.is_available() and torch.cuda.is_bf16_supported()
     dtype = torch.float32 if args.cpu else (torch.bfloat16 if bf16 else torch.float16)
     model = AutoModelForCausalLM.from_pretrained(
         args.model, revision=model_revision, dtype=dtype, attn_implementation="sdpa",

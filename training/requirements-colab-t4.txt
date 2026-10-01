@@ -1,0 +1,6 @@
+# Colab runtime image 2026.07: Python 3.12, provider torch 2.11.0+cu128.
+# Its preinstalled torchao 0.10 breaks PEFT 0.21 even for ordinary LoRA.
+# Preserve provider torch. Do not use this extra pin for arbitrary torch versions.
+# Compatibility: https://github.com/pytorch/ao/issues/2919
+-r requirements-mobile.txt
+torchao==0.17.0
