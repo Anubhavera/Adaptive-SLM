@@ -64,3 +64,10 @@ artifacts/cloud-runs/
 # Claude Code session artifacts
 .claude/worktrees/
 *.resolved
+
+# Android application outputs and machine-local SDK settings
+android-app/.gradle/
+android-app/**/build/
+android-app/local.properties
+android-app/.kotlin/
+android-app/.gradle-user/

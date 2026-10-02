@@ -1,0 +1,23 @@
+<?xml version='1.0' encoding='UTF-8' ?>
+<testsuites tests="6" failures="0" errors="0" skipped="0" time="2.296" timestamp="2026-10-02T11:54:57" hostname="localhost">
+  <testsuite name="org.adaptiveslm.demo.CatalogTest" tests="1" failures="0" errors="0" skipped="0" time="0.256" timestamp="2026-10-02T11:54:57" hostname="localhost">
+    <properties>
+      <property name="device" value="adaptive_slm_harness(AVD) - 14" />
+      <property name="flavor" value="" />
+      <property name="project" value=":app" />
+    </properties>
+    <testcase name="allSyntheticWorkflowsMatchObservableOracles" classname="org.adaptiveslm.demo.CatalogTest" time="0.256" />
+  </testsuite>
+  <testsuite name="org.adaptiveslm.demo.ToolStoreTest" tests="5" failures="0" errors="0" skipped="0" time="0.467" timestamp="2026-10-02T11:54:57" hostname="localhost">
+    <properties>
+      <property name="device" value="adaptive_slm_harness(AVD) - 14" />
+      <property name="flavor" value="" />
+      <property name="project" value=":app" />
+    </properties>
+    <testcase name="staleUpdatesAndMissingEntitiesDoNotMutate" classname="org.adaptiveslm.demo.ToolStoreTest" time="0.028" />
+    <testcase name="cancellationBeforeDispatchLeavesOperationAvailable" classname="org.adaptiveslm.demo.ToolStoreTest" time="0.027" />
+    <testcase name="journalFailureRollsBackEffectAndAllowsRetry" classname="org.adaptiveslm.demo.ToolStoreTest" time="0.107" />
+    <testcase name="lostAcknowledgementReplaySurvivesReopen" classname="org.adaptiveslm.demo.ToolStoreTest" time="0.077" />
+    <testcase name="taskCompletionAndConversationAreDurable" classname="org.adaptiveslm.demo.ToolStoreTest" time="0.228" />
+  </testsuite>
+</testsuites>

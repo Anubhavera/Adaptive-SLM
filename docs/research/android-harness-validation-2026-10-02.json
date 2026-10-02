@@ -1,0 +1,100 @@
+{
+  "recorded_at_utc": "2026-10-02T11:56:28.659673+00:00",
+  "base_commit": "c108ec6c40c21a02a5b94e9d62681c1667e69c4d",
+  "source_state": "Android app and plan updates are local, not committed by this session. Source hashes below identify tested functional files.",
+  "toolchain": {
+    "agp": "9.3.1",
+    "gradle": "9.7.1",
+    "jdk": "21.0.12.1+1",
+    "jvm_target": 17,
+    "compile_sdk": 36,
+    "target_sdk": 36,
+    "declared_min_sdk": 26
+  },
+  "apk": {
+    "path": "android-app/app/build/outputs/apk/debug/app-debug.apk",
+    "bytes": 911274,
+    "sha256": "5963c9959033f0b4e06fd52fb91c49aa18200305d46face6b40f4b1d4f66a424",
+    "declared_permissions": []
+  },
+  "jvm_tests": {
+    "name": "org.adaptiveslm.demo.ContractTest",
+    "tests": "4",
+    "skipped": "0",
+    "failures": "0",
+    "errors": "0",
+    "timestamp": "2026-10-02T11:52:40.351Z",
+    "hostname": "HP-EliteBook-x360-1040-G8-Notebook-PC",
+    "time": "0.085"
+  },
+  "android_tests": {
+    "tests": "6",
+    "failures": "0",
+    "errors": "0",
+    "skipped": "0",
+    "time": "2.296",
+    "timestamp": "2026-10-02T11:54:57",
+    "hostname": "localhost"
+  },
+  "device": {
+    "type": "isolated emulator",
+    "android_api": 34,
+    "android_version": "14",
+    "abi": "x86_64",
+    "serial": "emulator-5560",
+    "physical_phone_connected": false
+  },
+  "catalog": {
+    "synthetic_workflows": 7,
+    "dependent_calls": 16,
+    "language_model_benchmark": false
+  },
+  "lint": {
+    "errors": 0,
+    "warnings": 15,
+    "issue_ids": [
+      "AndroidGradlePluginVersion",
+      "DataExtractionRules",
+      "GradleDependency",
+      "MissingApplicationIcon",
+      "NewerVersionAvailable",
+      "OldTargetApi",
+      "SetTextI18n"
+    ]
+  },
+  "boundaries": [
+    "No LLM/native inference or model import is connected.",
+    "No physical M35 test in this session.",
+    "No minimum-API, arm64, low-end performance or sustained power validation.",
+    "Database reopen is not an actual process-kill/lifecycle test.",
+    "Guarantees cover this app SQLite effects only; not cross-app effects.",
+    "No controller novelty or model quality claim."
+  ],
+  "source_sha256": {
+    "android-app/app/build.gradle.kts": "98adc0358d60ee3f8b445c79244e56d56efb26a73c5397744ac570de3b30ff13",
+    "android-app/app/src/androidTest/kotlin/org/adaptiveslm/demo/CatalogTest.kt": "89645a77b62fa120685f9bb0eb8d84f6dfff2e3166ece08675f2b3dd74d62404",
+    "android-app/app/src/androidTest/kotlin/org/adaptiveslm/demo/ToolStoreTest.kt": "3b210aa30bfc42a9acf7670985df37926a632bd007a92b1087585a8c215126f0",
+    "android-app/app/src/main/AndroidManifest.xml": "3debb590cf823579ea278268e1a02c23811455664931688e2b931d9a18d16c32",
+    "android-app/app/src/main/assets/tool-catalog-v1.json": "326e8befd57fc80a703be22cf5027fb2669d5b3918b9cfb2225dea87d8f7f21e",
+    "android-app/app/src/main/kotlin/org/adaptiveslm/demo/Calculator.kt": "c132e02ff969f3564863da5fb778c99aacd956368f96c422217dc8b049171ab4",
+    "android-app/app/src/main/kotlin/org/adaptiveslm/demo/MainActivity.kt": "a488cc0060458b4863c863ea03192285100a40ff9f5f853c9eec92bdf768835d",
+    "android-app/app/src/main/kotlin/org/adaptiveslm/demo/ToolCall.kt": "d0071cd96d8dd4cb182517e4ad242a55956019b20edec7699c00f2b660439a0f",
+    "android-app/app/src/main/kotlin/org/adaptiveslm/demo/ToolStore.kt": "b3be59723a53e88d4a92fa443ff7810c7a63312e4d23d20d63ba1f99fe3125ac",
+    "android-app/app/src/test/kotlin/org/adaptiveslm/demo/ContractTest.kt": "7948c2644039680e41298fd121cb5bc3defb49f54a0bba6d7ca10a46c2a7a0e9",
+    "android-app/build.gradle.kts": "b11b0be429a9ff683d5e2aac1745699780786dcb9394707325073c6094ced036",
+    "android-app/gradle/wrapper/gradle-wrapper.jar": "7a9ce74cff467ca1bf60a4fcd9f05185acceda4d0f382434d393e17864262c5d",
+    "android-app/gradle/wrapper/gradle-wrapper.properties": "d01b41913834fb3cb14e71f69a08898e6a47e663b08f5c9b8c7e0772c38889d2",
+    "android-app/gradle.properties": "bcec3f41f03e1fcecc807afe61c5e1e8c922a1dfd8141bb684431b93b82770fa",
+    "android-app/gradlew": "a5a5c199ba02189ae8c46a334223371a20599d9c298ef65e7540ede4a3f72d59",
+    "android-app/settings.gradle.kts": "0a336e6fde583b91b737f83cd292082791d1e457f827004eff8c2be8d32182e0"
+  },
+  "app_launch": {
+    "status": "ok",
+    "device": "isolated API 34 emulator",
+    "screenshot": "docs/research/android-harness-2026-10-02.png"
+  },
+  "cleanup": {
+    "test_emulator": "stopped after verification",
+    "temporary_avd": "retained in /tmp; no user device/app data touched"
+  }
+}

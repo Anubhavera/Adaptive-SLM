@@ -1,6 +1,6 @@
 # AdaptiveSLM: next work and complete execution plan
 
-Updated: **2026-10-01, Asia/Calcutta (IST)**. Purpose: a durable handoff and working reference for subsequent research and implementation sessions. Update this file as decisions change and milestones acquire evidence. A planned task is not a completed result.
+Updated: **2026-10-02, Asia/Kolkata (IST)**. Purpose: a durable handoff and working reference for subsequent research and implementation sessions. Update this file as decisions change and milestones acquire evidence. A planned task is not a completed result.
 
 ## 1. Start here next session
 
@@ -8,12 +8,12 @@ Updated: **2026-10-01, Asia/Calcutta (IST)**. Purpose: a durable handoff and wor
 
 1. Read this file, the research proposal and the latest cloud execution records linked below.
 2. Inspect `git status` and the current commit. Preserve the user's changes. The last verified training source is `a72de2b4d41a7bf190b5a51d58eb7f46399b6843`; newer documentation and workflow files are currently local changes.
-3. Inventory the available Android SDK/NDK, JDK and Gradle tooling. There is no complete project-owned Android app/JNI integration in the inspected tree. Do not confuse upstream llama.cpp Android examples with our application.
-4. Define the initial tool contracts and test fixtures, then create the Android app with an inference interface, persistent state and a deterministic executor. Implement the tools before connecting model output to mutations.
+3. Read `android-app/README.md` and the latest Android harness validation. A project-owned scripted Android tool harness now exists. Native inference/JNI and model import are still unimplemented. Do not confuse upstream llama.cpp Android examples with our application.
+4. Finish device validation of the initial app-only tool contracts, fixtures and persistent executor; then add a single-owner inference interface and model import. The first UI uses framework widgets/SQLiteOpenHelper as a bootstrap; Compose/Room migration remains planned.
 5. Repair model-specific prompt/tool formatting in the native integration, import a known-provenance model and demonstrate offline chat plus bounded tool execution on the M35.
 6. Measure the app and run the small recovery pilot. Select a model/runtime and research direction from those results. Major task training follows that decision.
 
-This planning request creates the reference file; it does not execute the implementation milestones or publish anything. When work resumes, revalidate volatile dependencies, device availability and the current user request.
+Implementation resumed on 2026-10-02. See the execution record below; checked boxes require actual evidence. When work resumes, revalidate volatile dependencies, device availability and the current user request.
 
 ## 2. Confirmed intent and constraints
 
@@ -151,10 +151,10 @@ No calendar deadline is assumed. The order below is the dependency order; indepe
 
 ### M1 — Define the evaluation contract and build the Android shell
 
-- [ ] Create a small task catalog with initial state, request, expected observable final state, allowable effects, dependencies, authority and failure outcomes.
-- [ ] Implement the three controlled tool families and their state validators. Test create/update/complete, duplicate operation IDs, stale versions, missing entities, calculator errors and cancellation without an LLM.
+- [x] Create an initial synthetic task catalog with empty initial state, request, expected observable outcomes, app-only authority and dependent call references: `android-app/app/src/main/assets/tool-catalog-v1.json`. This is executor evaluation, not a held-out language-model benchmark.
+- [x] Implement the three controlled tool families and their state validators. Four JVM tests and six API 34 emulator instrumentation tests passed on 2026-10-02; the latter cover seven workflows/16 dependent calls plus replay, conflict, stale/missing state, cancellation and injected transaction rollback. Physical-phone validation remains outstanding.
 - [ ] Create `android-app/` with Kotlin UI, conversation/task storage, model import, inference-worker interface, streaming and cancel controls. Pin dependencies/toolchain versions after a clean build.
-- [ ] Use a mock planner first so executor and recovery behavior can be tested independently of model quality.
+- [x] Use scripted fixtures first so executor and recovery behavior can be tested independently of model quality. The UI explicitly says LLM inference is not attached; autonomous planning remains unimplemented.
 - [ ] Integrate native inference and model templates; add valid-call, malformed-call, no-tool and clarification fixtures.
 - [ ] Build/install on the authorized device and demonstrate airplane-mode chat and task execution against synthetic app data.
 
@@ -332,3 +332,13 @@ Legacy custom-student architecture, PAKD/profile distillation, semantic cache, e
 At the end of each implementation session, append a short dated entry: completed items and evidence paths; exact source/model/runtime revisions; failed checks and saved logs; current device/cloud state; changed decisions; blockers that actually require user input; and the next concrete action. Update milestone checkboxes only when their gates have supporting evidence. Reconcile newer records rather than overwriting historical measurements.
 
 **Current handoff:** training/export/checkpoint infrastructure has passed its bounded checks and the free T4 was released. The complete Android assistant, modern-model comparison, native tool-role training, lifecycle pilot and publication study remain to be built. Begin with M1's contracts and Android shell, while continuing the closest-paper review; validate a fresh-session resume before a longer task-training experiment.
+
+## 2026-10-02 execution record — Android executor foundation
+
+- Created `android-app/` with strict versioned app-only tool contracts, bounded arithmetic, a single background executor, SQLite entities/conversation/action journal, and a clearly labeled scripted fixture console. It declares no Android permissions, including `INTERNET`.
+- Built the debug app/test APKs. Four JVM tests and six Android instrumentation tests passed on a separate Android 14/API 34 x86_64 emulator. Seven synthetic catalog workflows (16 calls) passed observable-state assertions. Injected journal-write failure rolled back its effect; replay after database reopen produced no duplicate. This is not a process-kill benchmark.
+- Android lint completed with no errors and retained bootstrap warnings (see validation JSON). Inspected current official AGP compatibility and SQLite guidance through the user’s browser. AGP 9.3.1/Gradle 9.7.1/JDK 21 reuse installed host versions; not all latest patches.
+- Bootstrap deviation: framework widgets + `SQLiteOpenHelper` are used for the first test console; Compose/Room migration remains planned. Model import, JNI, chat templates, streaming and inference cancellation remain unimplemented. Do not mark M1 complete.
+- No physical USB phone was present. The first software-only emulator attempt was slow; hardware acceleration outside the sandbox was found and used for the successful tests. The isolated emulator is development evidence, not phone performance.
+- Evidence: `docs/research/android-harness-validation-2026-10-02.json`, preserved JVM/device test XML, and app screenshot. See `android-app/README.md` for contract/replay semantics and build commands. App code remains local until a reviewed commit/push.
+- **Next concrete action:** connect the authorized M35 and run the harness tests, then integrate checksum-verified model import and a single-owner JNI engine with model-specific templates. Use the known CPU smoke model first, then separately export/evaluate the cloud artifact. Do not spend another GPU session before the app/model evaluation path requires it.

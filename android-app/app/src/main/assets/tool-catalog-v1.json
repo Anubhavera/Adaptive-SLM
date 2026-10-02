@@ -1,0 +1,308 @@
+{
+  "version": 1,
+  "description": "Synthetic executor oracles, not a language-model benchmark. Each workflow starts with an empty database. Operation IDs are local to its database. Replay/crash checks are separate instrumentation tests.",
+  "workflows": [
+    {
+      "id": "arithmetic",
+      "request": "Calculate (12+8)*3",
+      "authority": "calculator only",
+      "steps": [
+        {
+          "name": "calc",
+          "call": {
+            "version": 1,
+            "operationId": "calc",
+            "tool": "calculator.evaluate",
+            "arguments": {
+              "expression": "(12+8)*3"
+            }
+          },
+          "expect": {
+            "status": "ok",
+            "data.value": 60
+          }
+        },
+        {
+          "name": "zero",
+          "call": {
+            "version": 1,
+            "operationId": "zero",
+            "tool": "calculator.evaluate",
+            "arguments": {
+              "expression": "1/0"
+            }
+          },
+          "expect": {
+            "status": "error",
+            "code": "arithmetic_error"
+          }
+        }
+      ]
+    },
+    {
+      "id": "notes-workflow",
+      "request": "Create a synthetic note, then read and update it",
+      "authority": "app notes only",
+      "steps": [
+        {
+          "name": "create",
+          "call": {
+            "version": 1,
+            "operationId": "create",
+            "tool": "notes.create",
+            "arguments": {
+              "title": "Fixture",
+              "body": "Before"
+            }
+          },
+          "expect": {
+            "status": "ok",
+            "data.version": 1
+          }
+        },
+        {
+          "name": "read",
+          "call": {
+            "version": 1,
+            "operationId": "read",
+            "tool": "notes.read",
+            "arguments": {
+              "id": {
+                "$ref": "create.data.id"
+              }
+            }
+          },
+          "expect": {
+            "status": "ok",
+            "data.body": "Before"
+          }
+        },
+        {
+          "name": "update",
+          "call": {
+            "version": 1,
+            "operationId": "update",
+            "tool": "notes.update",
+            "arguments": {
+              "id": {
+                "$ref": "create.data.id"
+              },
+              "expectedVersion": 1,
+              "title": "Fixture",
+              "body": "After"
+            }
+          },
+          "expect": {
+            "status": "ok",
+            "data.version": 2
+          }
+        },
+        {
+          "name": "search",
+          "call": {
+            "version": 1,
+            "operationId": "search",
+            "tool": "notes.search",
+            "arguments": {
+              "query": "After"
+            }
+          },
+          "expect": {
+            "status": "ok",
+            "data.items.length": 1
+          }
+        }
+      ]
+    },
+    {
+      "id": "task-workflow",
+      "request": "Create and complete a synthetic task",
+      "authority": "app tasks only",
+      "steps": [
+        {
+          "name": "create",
+          "call": {
+            "version": 1,
+            "operationId": "create",
+            "tool": "tasks.create",
+            "arguments": {
+              "title": "Evaluate offline"
+            }
+          },
+          "expect": {
+            "status": "ok",
+            "data.completed": false
+          }
+        },
+        {
+          "name": "complete",
+          "call": {
+            "version": 1,
+            "operationId": "complete",
+            "tool": "tasks.complete",
+            "arguments": {
+              "id": {
+                "$ref": "create.data.id"
+              },
+              "expectedVersion": 1
+            }
+          },
+          "expect": {
+            "status": "ok",
+            "data.completed": true,
+            "data.version": 2
+          }
+        },
+        {
+          "name": "list",
+          "call": {
+            "version": 1,
+            "operationId": "list",
+            "tool": "tasks.list",
+            "arguments": {}
+          },
+          "expect": {
+            "status": "ok",
+            "data.items.length": 1
+          }
+        }
+      ]
+    },
+    {
+      "id": "stale-state",
+      "request": "Reject a completion based on an outdated task version",
+      "authority": "app tasks only",
+      "steps": [
+        {
+          "name": "create",
+          "call": {
+            "version": 1,
+            "operationId": "create",
+            "tool": "tasks.create",
+            "arguments": {
+              "title": "Fixture"
+            }
+          },
+          "expect": {
+            "status": "ok"
+          }
+        },
+        {
+          "name": "complete",
+          "call": {
+            "version": 1,
+            "operationId": "complete",
+            "tool": "tasks.complete",
+            "arguments": {
+              "id": {
+                "$ref": "create.data.id"
+              },
+              "expectedVersion": 1
+            }
+          },
+          "expect": {
+            "status": "ok"
+          }
+        },
+        {
+          "name": "stale",
+          "call": {
+            "version": 1,
+            "operationId": "stale",
+            "tool": "tasks.complete",
+            "arguments": {
+              "id": {
+                "$ref": "create.data.id"
+              },
+              "expectedVersion": 1
+            }
+          },
+          "expect": {
+            "status": "error",
+            "code": "stale_version"
+          }
+        }
+      ]
+    },
+    {
+      "id": "missing-entity",
+      "request": "Read a missing synthetic note",
+      "authority": "app notes only",
+      "steps": [
+        {
+          "name": "missing",
+          "call": {
+            "version": 1,
+            "operationId": "missing",
+            "tool": "notes.read",
+            "arguments": {
+              "id": "absent"
+            }
+          },
+          "expect": {
+            "status": "error",
+            "code": "missing_entity"
+          }
+        }
+      ]
+    },
+    {
+      "id": "unsupported-capability",
+      "request": "Reject a tool outside our app capabilities",
+      "authority": "no shell authority",
+      "steps": [
+        {
+          "name": "shell",
+          "call": {
+            "version": 1,
+            "operationId": "shell",
+            "tool": "shell.execute",
+            "arguments": {
+              "command": "echo test"
+            }
+          },
+          "expect": {
+            "status": "error",
+            "code": "invalid_call"
+          }
+        }
+      ]
+    },
+    {
+      "id": "cancelled-dispatch",
+      "request": "Cancel before creating a task; verify no effect",
+      "authority": "app tasks only",
+      "steps": [
+        {
+          "name": "cancel",
+          "call": {
+            "version": 1,
+            "operationId": "cancel",
+            "tool": "tasks.create",
+            "arguments": {
+              "title": "Must not exist"
+            }
+          },
+          "expect": {
+            "status": "error",
+            "code": "cancelled"
+          },
+          "cancelled": true
+        },
+        {
+          "name": "list",
+          "call": {
+            "version": 1,
+            "operationId": "list",
+            "tool": "tasks.list",
+            "arguments": {}
+          },
+          "expect": {
+            "status": "ok",
+            "data.items.length": 0
+          }
+        }
+      ]
+    }
+  ]
+}

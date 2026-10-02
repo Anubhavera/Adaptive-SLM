@@ -16,6 +16,8 @@ On 2026-10-01, the existing local Qwen2.5 GGUF produced 31.9 tokens/s across thr
 
 ## Build
 
+The new [offline Android tool harness](android-app/README.md) provides an app-owned notes/task/calculator executor and persistence tests. It is a scripted fixture console; native model inference is the next integration step. See [upnext.md](upnext.md) for milestone status.
+
 ### Prerequisites
 
 - CMake 3.16+
